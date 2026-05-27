@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CLI Producer - Payment Processor</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --color-primary: #1a3620;
+            --color-primary-dark: #0f2414;
+            --color-primary-light: #2a5a32;
+            --color-accent: #7cb342;
+            --color-accent-light: #aed581;
+            --color-accent-dark: #558b2f;
+            --color-bg: #f5f7f0;
+            --color-card: #ffffff;
+            --color-text: #2d3a2d;
+            --color-text-light: #5a6a5a;
+            --color-text-muted: #8a9a8a;
+            --color-sidebar-bg: #1a3620;
+            --color-sidebar-hover: #0f2414;
+            --color-sidebar-text: #c8dcc8;
+            --color-sidebar-active: #7cb342;
+            --color-code-bg: #1e2a1e;
+            --color-border: #dce4d4;
+            --color-info-bg: #f1f8e9;
+            --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            --font-code: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+            --sidebar-width: 260px;
+            --topbar-height: 48px;
+        }
+        html { scroll-behavior: smooth; }
+        body { font-family:var(--font-body); background:var(--color-bg); color:var(--color-text); line-height:1.7; display:flex; min-height:100vh; padding-top:var(--topbar-height); }
+        .topbar { position:fixed; top:0; left:0; right:0; height:var(--topbar-height); background:var(--color-primary-dark); color:#e8f0e8; display:flex; align-items:center; padding:0 1rem; z-index:200; border-bottom:1px solid rgba(255,255,255,0.06); gap:0.75rem; }
+        .topbar .hamburger { display:none; background:none; border:none; color:#e8f0e8; font-size:1.4rem; cursor:pointer; padding:0.25rem 0.5rem; border-radius:4px; }
+        .topbar .hamburger:hover { background:rgba(255,255,255,0.1); }
+        .topbar .project-title { font-weight:700; font-size:0.95rem; letter-spacing:0.5px; }
+        .topbar .project-tagline { font-size:0.78rem; color:#9ab89a; margin-left:0.5rem; }
+        .topbar .project-tagline::before { content:"— "; }
+        .topbar .topbar-right { margin-left:auto; font-size:0.78rem; color:#9ab89a; }
+        .sidebar-overlay { display:none; position:fixed; top:0;left:0;right:0;bottom:0; background:rgba(0,0,0,0.4); z-index:98; }
+        .sidebar-overlay.open { display:block; }
+        .sidebar { width:var(--sidebar-width); background:var(--color-sidebar-bg); color:var(--color-sidebar-text); padding:1.2rem 0.75rem; position:fixed; top:var(--topbar-height); left:0; bottom:0; overflow-y:auto; z-index:99; border-right:1px solid rgba(255,255,255,0.04); transition:transform .3s ease; }
+        .sidebar h2 { font-size:0.7rem; color:var(--color-accent-light); margin-bottom:0.6rem; text-transform:uppercase; letter-spacing:1.5px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:0.5rem; font-weight:600; }
+        .sidebar ul { list-style:none; padding:0; }
+        .sidebar ul li { margin-bottom:0.15rem; }
+        .sidebar ul li a { color:var(--color-sidebar-text); text-decoration:none; font-size:0.88rem; display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0.6rem; border-radius:6px; transition:background .2s,color .2s,padding-left .2s; border-left:3px solid transparent; }
+        .sidebar ul li a:hover { background:var(--color-sidebar-hover); color:#fff; padding-left:0.8rem; }
+        .sidebar ul li a.active { background:var(--color-sidebar-hover); color:var(--color-sidebar-active); border-left-color:var(--color-sidebar-active); font-weight:600; }
+        .sidebar ul li a .nav-icon { font-size:1rem; width:1.4rem; text-align:center; opacity:0.7; }
+        .sidebar ul li a.active .nav-icon { opacity:1; }
+        .sidebar .nav-section { margin-bottom:1.5rem; }
+        .breadcrumb { display:flex; align-items:center; gap:0.4rem; font-size:0.8rem; color:var(--color-text-muted); margin-bottom:0.5rem; padding:0.4rem 0; flex-wrap:wrap; }
+        .breadcrumb a { color:var(--color-accent); text-decoration:none; }
+        .breadcrumb a:hover { text-decoration:underline; }
+        .breadcrumb .sep { color:var(--color-text-muted); font-size:0.7rem; }
+        .breadcrumb .current { color:var(--color-text-light); font-weight:500; }
+        .main-content { margin-left:var(--sidebar-width); flex:1; padding:1.5rem 2.5rem 3rem; max-width:960px; }
+        header { background:linear-gradient(135deg,var(--color-primary-dark) 0%,var(--color-primary) 40%,#2a5a32 100%); color:#fff; padding:2rem 2.5rem; border-radius:10px; margin-bottom:2rem; position:relative; overflow:hidden; }
+        header::before { content:''; position:absolute; top:0;left:0;right:0;bottom:0; background:repeating-linear-gradient(45deg,transparent,transparent 20px,rgba(255,255,255,0.015) 20px,rgba(255,255,255,0.015) 21px); pointer-events:none; }
+        header h1 { font-size:2rem; margin-bottom:0.3rem; color:#ffffff; position:relative; z-index:1; }
+        header p { color:#c8dcc8; font-size:0.95rem; position:relative; z-index:1; max-width:80%; }
+        h1, h2, h3, h4, h5, h6 { color:var(--color-primary); margin-top:1.8rem; margin-bottom:0.8rem; font-weight:700; line-height:1.3; }
+        h1 { font-size:2rem; border-bottom:2px solid var(--color-accent); padding-bottom:0.5rem; }
+        h2 { font-size:1.6rem; border-bottom:2px solid var(--color-accent-light); padding-bottom:0.3rem; }
+        h3 { font-size:1.25rem; }
+        h4 { font-size:1.05rem; }
+        h2, h3 { scroll-margin-top:calc(var(--topbar-height) + 1rem); }
+        p { margin-bottom:1rem; }
+        a { color:var(--color-accent); text-decoration:none; }
+        a:hover { text-decoration:underline; }
+        ul, ol { margin-bottom:1rem; padding-left:2rem; }
+        li { margin-bottom:0.3rem; }
+        table { width:100%; border-collapse:collapse; margin-bottom:1.5rem; font-size:0.88rem; border-radius:8px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.04); }
+        table th, table td { border:1px solid var(--color-border); padding:0.65rem 0.9rem; text-align:left; }
+        table th { background:var(--color-primary); color:#fff; font-weight:600; font-size:0.82rem; letter-spacing:0.3px; text-transform:uppercase; }
+        table tr:nth-child(even) { background:#fafcfa; }
+        table tr:hover { background:#f0f5ec; transition:background .15s; }
+        pre { background:var(--color-code-bg); color:#e8e8e8; padding:1rem 1rem 1rem 1.2rem; border-radius:8px; overflow-x:auto; font-family:var(--font-code); font-size:0.82rem; line-height:1.55; margin-bottom:1.5rem; position:relative; border-left:3px solid var(--color-accent); }
+        code { font-family:var(--font-code); font-size:0.85rem; background:#e8f0e4; padding:0.15rem 0.4rem; border-radius:3px; color:var(--color-primary); }
+        pre code { background:transparent; padding:0; font-size:inherit; color:inherit; }
+        .copy-btn { position:absolute; top:0.5rem; right:0.5rem; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:#b0c0b0; cursor:pointer; font-size:0.72rem; padding:0.25rem 0.6rem; border-radius:4px; opacity:0; transition:opacity .2s,background .2s; font-family:var(--font-body); }
+        pre:hover .copy-btn { opacity:1; }
+        .copy-btn:hover { background:rgba(255,255,255,0.15); color:#fff; }
+        .copy-btn.copied { background:var(--color-accent); color:#fff; border-color:var(--color-accent); }
+        blockquote { border-left:4px solid var(--color-accent); padding:0.75rem 1.2rem; margin-bottom:1rem; background:var(--color-info-bg); border-radius:0 6px 6px 0; }
+        blockquote p { margin-bottom:0; }
+        hr { border:none; border-top:1px solid var(--color-border); margin:2rem 0; }
+        .footer { margin-top:3rem; padding-top:1.5rem; border-top:1px solid var(--color-border); text-align:center; color:var(--color-text-muted); font-size:0.82rem; }
+        .footer a { color:var(--color-accent); }
+        .footer-links { display:flex; justify-content:center; gap:0.4rem; flex-wrap:wrap; margin-top:0.5rem; }
+        .footer-links a { padding:0.2rem 0.5rem; }
+        .mermaid-wrapper { position:relative; background:var(--color-sidebar-bg); border-radius:10px; margin-bottom:1.5rem; overflow:hidden; min-height:300px; box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+        .mermaid-wrapper .mermaid { padding:1.5rem; text-align:center; margin:0; border-radius:0; background:none; }
+        .mermaid-wrapper .mermaid svg { max-width:none; width:100%; height:auto; cursor:grab; transform-origin:0 0; }
+        .mermaid-wrapper .mermaid svg:active { cursor:grabbing; }
+        .zoom-toolbar { position:absolute; bottom:10px; right:10px; display:flex; gap:4px; z-index:10; opacity:0.4; transition:opacity .2s; }
+        .mermaid-wrapper:hover .zoom-toolbar { opacity:1; }
+        .zoom-toolbar button { width:32px; height:32px; border:1px solid rgba(255,255,255,0.15); background:rgba(0,0,0,0.4); color:#e0e0e0; border-radius:4px; cursor:pointer; font-size:18px; line-height:1; display:flex; align-items:center; justify-content:center; transition:background .2s; user-select:none; backdrop-filter:blur(4px); }
+        .zoom-toolbar button:hover { background:rgba(0,0,0,0.6); border-color:var(--color-accent-light); }
+        .mermaid-caption { font-size:0.85rem; color:var(--color-text-muted); text-align:center; margin-top:-1rem; margin-bottom:1.5rem; font-style:italic; }
+        .lightbox { display:none; position:fixed; z-index:9999; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); align-items:center; justify-content:center; padding:2rem; }
+        .lightbox.open { display:flex; }
+        .lightbox img { max-width:95vw; max-height:90vh; border-radius:8px; box-shadow:0 8px 40px rgba(0,0,0,0.5); object-fit:contain; }
+        .lightbox .close-btn { position:absolute; top:1rem; right:1.5rem; color:#fff; font-size:2rem; cursor:pointer; background:rgba(255,255,255,0.1); width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:none; transition:background .2s; }
+        .lightbox .close-btn:hover { background:rgba(255,255,255,0.2); }
+        .lightbox .caption { position:absolute; bottom:1.5rem; left:50%; transform:translateX(-50%); color:#ccc; font-size:0.9rem; background:rgba(0,0,0,0.5); padding:0.4rem 1rem; border-radius:6px; max-width:80%; text-align:center; }
+        @media (max-width:768px) { .topbar .hamburger { display:block; } .topbar .project-tagline, .topbar .topbar-right { display:none; } .sidebar { transform:translateX(-100%); } .sidebar.open { transform:translateX(0); } .main-content { margin-left:0; padding:1rem; } header { padding:1.5rem; } header h1 { font-size:1.4rem; } header p { max-width:100%; } table { font-size:0.78rem; } table th, table td { padding:0.4rem 0.5rem; } .lightbox { padding:1rem; } pre { font-size:0.76rem; padding:0.8rem; } }
+        @media (max-width:480px) { .main-content { padding:0.75rem; } header { padding:1.2rem; } header h1 { font-size:1.2rem; } }
+        @media print { .sidebar, .topbar, .lightbox, .copy-btn, .zoom-toolbar { display:none !important; } .main-content { margin-left:0; padding:0; } body { padding-top:0; } pre { white-space:pre-wrap; break-inside:avoid; } }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <button class="hamburger" onclick="toggleSidebar()" aria-label="Abrir menu">&#9776;</button>
+        <span class="project-title">Payment Processor</span>
+        <span class="project-tagline">Sistema de Processamento de Pagamentos</span>
+        <div class="topbar-right"><span>v1.0.0</span></div>
+    </div>
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+    <nav class="sidebar" id="sidebar">
+        <div class="nav-section">
+            <h2>Payment Processor</h2>
+            <ul>
+                <li><a href="../index.html"><span class="nav-icon">&#127968;</span> Início</a></li>
+                <li><a href="../architecture.html"><span class="nav-icon">&#128202;</span> Arquitetura</a></li>
+                <li><a href="../setup.html"><span class="nav-icon">&#9881;</span> Setup</a></li>
+                <li><a href="../observability.html"><span class="nav-icon">&#128200;</span> Observabilidade</a></li>
+            </ul>
+        </div>
+        <div class="nav-section">
+            <h2>Features</h2>
+            <ul>
+                <li><a href="payment-consumer.html"><span class="nav-icon">&#9889;</span> Payment Consumer</a></li>
+                <li><a href="payment-ui.html"><span class="nav-icon">&#128187;</span> Payment UI</a></li>
+                <li><a href="cli-producer.html" class="active"><span class="nav-icon">&#128295;</span> CLI Producer</a></li>
+            </ul>
+        </div>
+    </nav>
+    <div class="main-content">
+        <div class="breadcrumb">
+            <a href="../index.html">Início</a>
+            <span class="sep">/</span>
+            <a href="../index.html#features">Features</a>
+            <span class="sep">/</span>
+            <span class="current">CLI Producer</span>
+        </div>
+        <header>
+            <h1>CLI Producer</h1>
+            <p>Ferramenta de linha de comando para publicar eventos de pagamento no Kafka.</p>
+        </header>
+
+        <h2 id="o-que-e">O que é</h2>
+        <p>O <strong>CLI Producer</strong> é uma ferramenta de linha de comando para publicar eventos de pagamento no tópico Kafka <code>payment.events</code> diretamente do terminal.</p>
+
+        <h2 id="por-que-existe">Por que existe</h2>
+        <p>Desenvolvedores e engenheiros de QA precisam de uma ferramenta rápida para:</p>
+        <ul>
+            <li><strong>Testar o consumer</strong> sem dependência de sistemas externos</li>
+            <li><strong>Simular cenários</strong> específicos (pagamentos falhos, inválidos, etc.)</li>
+            <li><strong>Executar testes de carga</strong> controlados com bulk mode e rate limiting</li>
+            <li><strong>Depurar</strong> o comportamento do consumer com payloads customizados</li>
+        </ul>
+
+        <h2 id="como-funciona">Como funciona</h2>
+
+        <h3 id="fluxo-de-uso">Fluxo de Uso</h3>
+        <pre>Usuário invoca CLI
+        │
+        ▼
+┌─────────────────────┐
+│ 1. Parse flags      │ ← flag stdlib
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│ 2. Fonte dos dados  │
+│    ├─ --payload     │ → JSON direto
+│    ├─ stdin pipe    │ → echo | producer
+│    ├─ --file        │ → arquivo JSON
+│    └─ flags + auto  │ → geração automática
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│ 3. Validação        │ ← internal/validator (reusado do consumer)
+└─────────┬───────────┘
+          │
+     ┌────┴────┐
+     │ dry-run │ → Exibe JSON e sai
+     └────┬────┘
+          │ Normal
+          ▼
+┌─────────────────────┐
+│ 4. Publicação Kafka │ ← sarama SyncProducer
+│    (com timeout)    │
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│ 5. Exibir resultado │ → partition/offset ou erro
+└─────────────────────┘</pre>
+
+        <h3 id="diagrama-interativo">Diagrama Interativo do Fluxo</h3>
+        <div class="mermaid-wrapper"><div class="mermaid">
+            graph LR
+                subgraph Sources["Fontes de Dados"]
+                    P1["--payload JSON direto objeto único ou array"]
+                    P2["stdin pipe echo | producer pipe do terminal"]
+                    P3["--file arquivo JSON array ou objeto único"]
+                    P4["--count N auto-geração N eventos sequenciais"]
+                    P5["flags individuais --status --amount geração automática"]
+                end
+                subgraph Precedencia["Ordem de Precedência"]
+                    A["1º --payload máxima prioridade"]
+                    B["2º stdin pipe redirecionamento"]
+                    C["3º --file arquivo externo"]
+                    D["4º --count > 1 bulk mode"]
+                    E["5º default flags + defaults 1 evento"]
+                end
+                subgraph Processamento["Pipeline"]
+                    V["Validar reusa validator consumer go-playground/validator"]
+                    DR{"dry-run? --dry-run"}
+                    RL["Rate Limiting --rate N ev/s time.Ticker"]
+                    KP["Publicar Kafka SyncProducer timeout 10s + dial 5s"]
+                    RES["Exibir resultado texto ou JSON partition/offset"]
+                end
+                A --> V
+                B --> V
+                C --> V
+                D --> V
+                E --> V
+                D -.->|controle| RL
+                V --> DR
+                DR -->|"Sim"| OUT["Exibir JSON e sair (exit 0)"]
+                DR -->|"Não"| KP
+                KP --> RES
+                RES -->|"sucesso"| EX0["Exit 0 Todos publicados"]
+                RES -->|"falha"| EX1["Exit 1 Algum erro"]
+                click V "features/payment-consumer.html#validador" "Ver validador reusado do consumer"
+                click KP "setup.html" "Ver configuração Kafka no setup"
+                style P1 fill:#33691e,stroke:#aed581
+                style P2 fill:#33691e,stroke:#aed581
+                style P3 fill:#33691e,stroke:#aed581
+                style P4 fill:#33691e,stroke:#aed581
+                style P5 fill:#33691e,stroke:#aed581
+                style A fill:#558b2f,stroke:#8bc34a
+                style B fill:#558b2f,stroke:#8bc34a
+                style C fill:#558b2f,stroke:#8bc34a
+                style D fill:#558b2f,stroke:#8bc34a
+                style E fill:#558b2f,stroke:#8bc34a
+                style V fill:#558b2f,stroke:#8bc34a,stroke-width:2px
+                style DR fill:#7d6608,stroke:#f1c40f,stroke-width:2px
+                style RL fill:#7d6608,stroke:#f1c40f
+                style KP fill:#533483,stroke:#9b59b6,stroke-width:3px
+                style RES fill:#558b2f,stroke:#8bc34a
+                style EX0 fill:#1e8449,stroke:#2ecc71,stroke-width:2px
+                style EX1 fill:#7b241c,stroke:#e74c3c,stroke-width:2px
+                style OUT fill:#1e8449,stroke:#2ecc71
+        </div>
+        <p class="mermaid-caption">Fluxo completo do CLI Producer. Ordem de precedência das fontes de dados (1º a 5º) e pipeline de processamento com decisão de dry-run.</p>
+        </div>
+
+        <div class="mermaid-wrapper"><div class="mermaid">
+            sequenceDiagram
+                participant U as Usuário
+                participant CLI as CLI Producer
+                participant VAL as Validador
+                participant K as Kafka
+
+                U->>CLI: executa comando
+                activate CLI
+                Note over CLI: parse de flags
+                alt --payload
+                    CLI->>CLI: lê JSON direto
+                else stdin pipe
+                    CLI->>CLI: lê do terminal
+                else --file
+                    CLI->>CLI: lê arquivo JSON
+                else --count N
+                    CLI->>CLI: gera N eventos auto UUID
+                else flags individuais
+                    CLI->>CLI: monta evento com defaults
+                end
+                CLI->>VAL: validate(payload)
+                activate VAL
+                alt inválido
+                    VAL-->>CLI: erro
+                    CLI-->>U: exibe erro (exit 1)
+                else válido
+                    VAL-->>CLI: ok
+                end
+                deactivate VAL
+                alt --dry-run
+                    CLI-->>U: exibe JSON e sai (exit 0)
+                else
+                    Note over CLI: --rate N controla ticker por segundo
+                    CLI->>K: SyncProducer.publish
+                    activate K
+                    alt sucesso
+                        K-->>CLI: partition + offset
+                        CLI-->>U: ✓ publicado (exit 0)
+                    else falha
+                        K-->>CLI: erro
+                        CLI-->>U: ✗ falha (exit 1)
+                    end
+                    deactivate K
+                end
+                alt --json-output
+                    CLI-->>U: saída JSON para scripting
+                end
+                deactivate CLI
+        </div>
+        <p class="mermaid-caption">Diagrama de sequência UML — Publicação via CLI com validação, dry-run e saída formatada. Suporta múltiplas fontes de dados.</p>
+        </div>
+
+        <h3 id="comandos-e-flags">Comandos e Flags</h3>
+        <pre>Uso: producer publish [flags]
+
+Flags:
+  --payment-id STRING    UUID v4 do pagamento (auto-gerado se vazio)
+  --status STRING        Status: pending|confirmed|failed|refunded (default: confirmed)
+  --amount FLOAT         Valor do pagamento > 0 (default: 100.00)
+  --currency STRING      ISO 4217 (default: BRL)
+  --description STRING   Descrição opcional (max 255 chars)
+
+  --topic STRING         Tópico Kafka (default: payment.events)
+  --brokers STRING       Brokers Kafka separados por vírgula (default: localhost:9092)
+
+  --payload STRING       JSON payload direto (sobrescreve flags individuais)
+  --file STRING          Arquivo JSON com array de eventos
+  --count INT            Número de eventos em bulk mode (default: 1)
+  --rate INT             Eventos por segundo em bulk mode (0 = sem limite)
+
+  --dry-run              Apenas exibir JSON sem publicar
+  --json-output          Saída em JSON (para scripting)
+  --help                 Exibir ajuda
+
+Stdin:
+  echo '{"payment_id":"...","status":"confirmed"}' | producer publish</pre>
+
+        <h3 id="ordem-de-precedencia">Ordem de Precedência da Fonte de Dados</h3>
+        <ol>
+            <li><code>--payload</code> → JSON direto (objeto único ou array)</li>
+            <li><strong>stdin pipe</strong> → ler do terminal</li>
+            <li><code>--file</code> → ler eventos de arquivo JSON (array ou objeto único)</li>
+            <li><code>--count &gt; 1</code> → gerar N eventos automáticos (bulk)</li>
+            <li><strong>Default</strong> → gerar 1 evento com flags + defaults</li>
+        </ol>
+
+        <h3 id="modos-de-saida">Modos de Saída</h3>
+
+        <h4 id="modo-texto">Modo Texto (default)</h4>
+        <pre>✓ Published a1b2c3d4-e5f6-7890-abcd-ef1234567890 → partition 0, offset 42
+✗ Failed b2c3d4e5-f6a7-8901-bcde-f12345678901 → validation error: amount must be greater than 0</pre>
+
+        <h4 id="modo-json">Modo JSON (<code>--json-output</code>)</h4>
+        <pre><code>{"status":"success","payment_id":"a1b2c3d4-...","partition":0,"offset":42}
+{"status":"error","payment_id":"b2c3d4e5-...","error":"validation error: ..."}</code></pre>
+
+        <h3 id="geracao-de-eventos">Geração de Eventos</h3>
+        <p>A CLI gera eventos automaticamente quando nenhuma fonte explícita é fornecida:</p>
+        <p><strong>Evento único</strong> (default):</p>
+        <ul>
+            <li><code>payment_id</code>: UUID v4 aleatório (se não fornecido)</li>
+            <li><code>status</code>: <code>confirmed</code> (default)</li>
+            <li><code>amount</code>: 100.00 (default)</li>
+            <li><code>currency</code>: BRL (default)</li>
+            <li><code>description</code>: vazio</li>
+            <li><code>timestamp</code>: atual (RFC3339)</li>
+        </ul>
+        <p><strong>Bulk mode</strong> (<code>--count N</code>):</p>
+        <ul>
+            <li>Gera N eventos com dados sequenciais</li>
+            <li><code>amount</code> varia: 10, 20, 30... (N × 10)</li>
+            <li><code>description</code>: "Bulk event X of N"</li>
+            <li>Cada evento tem UUID único</li>
+        </ul>
+
+        <h3 id="rate-limiting">Rate Limiting</h3>
+        <p>Em bulk mode, <code>--rate</code> controla o número de eventos por segundo:</p>
+        <pre><code># 10 eventos por segundo
+producer publish --count 50 --rate 10</code></pre>
+        <ul>
+            <li>Usa <code>time.Ticker</code> para controle de taxa</li>
+            <li>Precisão de ±5% para rates moderados (1-50 ev/s)</li>
+            <li><code>--rate 0</code> (ou omitido) = sem limite (máxima velocidade)</li>
+        </ul>
+
+        <h2 id="configuracao">Configuração</h2>
+        <table>
+            <thead>
+                <tr><th>Parâmetro</th><th>Default</th><th>Flag</th><th>Descrição</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Brokers Kafka</td><td><code>localhost:9092</code></td><td><code>--brokers</code></td><td>Lista separada por vírgula</td></tr>
+                <tr><td>Tópico</td><td><code>payment.events</code></td><td><code>--topic</code></td><td>Tópico Kafka destino</td></tr>
+                <tr><td>Timeout Kafka</td><td>10s</td><td>(fixo)</td><td>Timeout do SyncProducer</td></tr>
+                <tr><td>Dial timeout</td><td>5s</td><td>(fixo)</td><td>Timeout de conexão TCP</td></tr>
+            </tbody>
+        </table>
+
+        <h2 id="codigos-de-saida">Códigos de Saída</h2>
+        <table>
+            <thead>
+                <tr><th>Situação</th><th>Exit Code</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Todos eventos publicados com sucesso</td><td>0</td></tr>
+                <tr><td>Algum evento falhou (validação/Kafka)</td><td>1</td></tr>
+                <tr><td>Erro de parse de flags</td><td>1</td></tr>
+                <tr><td>Erro de I/O (arquivo)</td><td>1</td></tr>
+                <tr><td>Erro de conexão Kafka</td><td>1</td></tr>
+                <tr><td>Ctrl+C durante publicação</td><td>1</td></tr>
+            </tbody>
+        </table>
+
+        <h2 id="exemplos-de-uso">Exemplos de Uso</h2>
+
+        <h3 id="evento-com-flags">Publicar evento com flags individuais</h3>
+        <pre><code>producer publish \
+  --payment-id "a1b2c3d4-e5f6-7890-abcd-ef1234567890" \
+  --status confirmed \
+  --amount 150.00 \
+  --currency BRL \
+  --description "Pagamento de teste"</code></pre>
+
+        <h3 id="json-direto">Publicar com JSON direto</h3>
+        <pre><code>producer publish --payload '{
+  "payment_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "status": "confirmed",
+  "amount": 150.00,
+  "currency": "BRL"
+}'</code></pre>
+
+        <h3 id="dry-run">Modo dry-run (apenas validar e exibir)</h3>
+        <pre><code>producer publish --dry-run
+
+# Com saída JSON
+producer publish --dry-run --json-output</code></pre>
+
+        <h3 id="bulk-mode">Bulk mode</h3>
+        <pre><code># Publicar 100 eventos
+producer publish --count 100
+
+# Publicar 50 eventos a 5 por segundo
+producer publish --count 50 --rate 5</code></pre>
+
+        <h3 id="stdin-pipe">Pipe do stdin</h3>
+        <pre><code>echo '{"payment_id":"abc-123","status":"confirmed","amount":100,"currency":"BRL"}' | producer publish</code></pre>
+
+        <h3 id="arquivo-json">Arquivo JSON</h3>
+        <pre><code># Arquivo com array de eventos
+producer publish --file events.json
+
+# Arquivo com objeto único
+echo '{"payment_id":"abc","status":"confirmed","amount":100,"currency":"BRL"}' > event.json
+producer publish --file event.json</code></pre>
+
+        <h3 id="saida-json">Saída JSON para scripting</h3>
+        <pre><code>producer publish --count 10 --json-output | jq -s 'map(select(.status == "success")) | length'</code></pre>
+
+        <h3 id="cenarios-de-erro">Simular cenários de erro</h3>
+        <pre><code># Amount inválido (deve falhar na validação)
+producer publish --amount -10
+
+# Status inválido
+producer publish --status invalid
+
+# UUID inválido
+producer publish --payment-id "not-a-uuid"</code></pre>
+
+        <h2 id="edge-cases">Edge Cases</h2>
+        <table>
+            <thead>
+                <tr><th>Cenário</th><th>Comportamento</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>--count 0</code></td><td>Tratado como 1 (gera 1 evento)</td></tr>
+                <tr><td><code>--payload</code> + <code>--file</code> conflitantes</td><td><code>--payload</code> tem prioridade</td></tr>
+                <tr><td>Stdin vazio (sem pipe)</td><td>Usa default/flags individuais</td></tr>
+                <tr><td>Pipe com conteúdo vazio</td><td>Erro "stdin is empty", exit 1</td></tr>
+                <tr><td>Arquivo JSON mal formatado</td><td>Erro descritivo, exit 1</td></tr>
+                <tr><td>Arquivo &gt; 10 MB</td><td>Rejeitado, exit 1</td></tr>
+                <tr><td>Kafka broker offline</td><td>Erro de conexão, exit 1</td></tr>
+                <tr><td>Ctrl+C durante bulk</td><td>Publicação interrompida, resultados parciais exibidos</td></tr>
+                <tr><td>Evento inválido no meio do bulk</td><td>Evento pula (Result com erro), restante continua</td></tr>
+                <tr><td>Payload com campos extras</td><td>Aceito (tolerância do json.Unmarshal)</td></tr>
+                <tr><td><code>--rate</code> muito alto (&gt;100/s)</td><td>Rate real pode ser menor que o configurado (imprecisão do Ticker)</td></tr>
+            </tbody>
+        </table>
+
+        <div class="footer">
+            <p>Payment Processor - Documentação Técnica</p>
+            <div class="footer-links">
+                <a href="../index.html">Início</a>
+                <a href="../architecture.html">Arquitetura</a>
+                <a href="../setup.html">Setup</a>
+                <a href="../observability.html">Observabilidade</a>
+                <a href="payment-consumer.html">Consumer</a>
+                <a href="payment-ui.html">UI</a>
+                <a href="cli-producer.html">CLI</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+        <button class="close-btn" onclick="closeLightboxDirect()">&times;</button>
+        <img id="lightboxImg" src="" alt="">
+        <div class="caption" id="lightboxCaption"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({startOnLoad:true,securityLevel:'loose',theme:'dark',themeVariables:{primaryColor:'#1a2e20',primaryTextColor:'#e0e0e0',primaryBorderColor:'#4a5a4a',lineColor:'#6a7a6a',secondaryColor:'#1a3620',tertiaryColor:'#33691e',fontSize:'14px'},flowchart:{useMaxWidth:true,htmlLabels:true,curve:'basis'}});
+        function openLightbox(img){var lb=document.getElementById('lightbox'),lbImg=document.getElementById('lightboxImg'),lbCap=document.getElementById('lightboxCaption');lbImg.src=img.src;var cap=img.nextElementSibling;if(cap&&cap.classList.contains('diagram-caption'))lbCap.textContent=cap.textContent;else lbCap.textContent='';lb.classList.add('open');document.body.style.overflow='hidden';}
+        function closeLightbox(e){if(e.target===e.currentTarget)closeLightboxDirect();}
+        function closeLightboxDirect(){document.getElementById('lightbox').classList.remove('open');document.body.style.overflow='';}
+        document.addEventListener('keydown',function(e){if(e.key==='Escape')closeLightboxDirect();});
+        function addCopyButtons(){document.querySelectorAll('pre').forEach(function(pre){if(pre.querySelector('.copy-btn'))return;var btn=document.createElement('button');btn.className='copy-btn';btn.textContent='Copy';btn.onclick=function(){var code=pre.querySelector('code'),text=code?code.textContent:pre.textContent;navigator.clipboard.writeText(text).then(function(){btn.textContent='Copied!';btn.classList.add('copied');setTimeout(function(){btn.textContent='Copy';btn.classList.remove('copied')},2000)}).catch(function(){btn.textContent='Failed';setTimeout(function(){btn.textContent='Copy'},2000)})};pre.appendChild(btn)})}
+        function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebarOverlay').classList.toggle('open')}
+        function initZoom(){var wrappers=document.querySelectorAll('.mermaid-wrapper');if(wrappers.length===0){setTimeout(initZoom,300);return}wrappers.forEach(function(wrapper){var svg=wrapper.querySelector('svg');if(!svg)return;svg.style.transformOrigin='0 0';var scale=1,tx=0,ty=0,panning=false,sx=0,sy=0;function update(){svg.style.transform='translate('+tx+'px,'+ty+'px) scale('+scale+')'};var tb=document.createElement('div');tb.className='zoom-toolbar';var bi=document.createElement('button');bi.textContent='+';bi.onclick=function(){scale=Math.min(scale*1.4,10);update()};var bo=document.createElement('button');bo.textContent='−';bo.onclick=function(){scale=Math.max(scale/1.4,0.3);update()};var br=document.createElement('button');br.textContent='↺';br.onclick=function(){scale=1;tx=0;ty=0;update()};tb.appendChild(bi);tb.appendChild(bo);tb.appendChild(br);wrapper.appendChild(tb);svg.addEventListener('mousedown',function(e){panning=true;sx=e.clientX-tx;sy=e.clientY-ty;svg.style.cursor='grabbing'});document.addEventListener('mousemove',function(e){if(!panning)return;tx=e.clientX-sx;ty=e.clientY-sy;update()});document.addEventListener('mouseup',function(){panning=false;svg.style.cursor='grab'});wrapper.addEventListener('wheel',function(e){e.preventDefault();var d=e.deltaY>0?1/1.1:1.1;scale=Math.max(0.3,Math.min(10,scale*d));update()},{passive:false})})}
+        if(document.readyState==='complete'){setTimeout(function(){initZoom();addCopyButtons()},500)}else{window.addEventListener('load',function(){setTimeout(function(){initZoom();addCopyButtons()},500)})}
+    </script>
+</body>
+</html>

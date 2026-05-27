@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arquitetura do Sistema - Payment Processor</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --color-primary: #1a3620;
+            --color-primary-dark: #0f2414;
+            --color-primary-light: #2a5a32;
+            --color-accent: #7cb342;
+            --color-accent-light: #aed581;
+            --color-accent-dark: #558b2f;
+            --color-bg: #f5f7f0;
+            --color-card: #ffffff;
+            --color-text: #2d3a2d;
+            --color-text-light: #5a6a5a;
+            --color-text-muted: #8a9a8a;
+            --color-sidebar-bg: #1a3620;
+            --color-sidebar-hover: #0f2414;
+            --color-sidebar-text: #c8dcc8;
+            --color-sidebar-active: #7cb342;
+            --color-code-bg: #1e2a1e;
+            --color-border: #dce4d4;
+            --color-info-bg: #f1f8e9;
+            --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            --font-code: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+            --sidebar-width: 260px;
+            --topbar-height: 48px;
+        }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: var(--font-body);
+            background: var(--color-bg);
+            color: var(--color-text);
+            line-height: 1.7;
+            display: flex;
+            min-height: 100vh;
+            padding-top: var(--topbar-height);
+        }
+        .topbar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: var(--topbar-height);
+            background: var(--color-primary-dark);
+            color: #e8f0e8;
+            display: flex;
+            align-items: center;
+            padding: 0 1rem;
+            z-index: 200;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            gap: 0.75rem;
+        }
+        .topbar .hamburger {
+            display: none;
+            background: none; border: none;
+            color: #e8f0e8; font-size: 1.4rem; cursor: pointer;
+            padding: 0.25rem 0.5rem; border-radius: 4px;
+        }
+        .topbar .hamburger:hover { background: rgba(255,255,255,0.1); }
+        .topbar .project-title { font-weight: 700; font-size: 0.95rem; letter-spacing: 0.5px; }
+        .topbar .project-tagline { font-size: 0.78rem; color: #9ab89a; margin-left: 0.5rem; }
+        .topbar .project-tagline::before { content: "— "; }
+        .topbar .topbar-right { margin-left: auto; font-size: 0.78rem; color: #9ab89a; }
+        .sidebar-overlay { display: none; position: fixed; top:0;left:0;right:0;bottom:0; background: rgba(0,0,0,0.4); z-index: 98; }
+        .sidebar-overlay.open { display: block; }
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--color-sidebar-bg);
+            color: var(--color-sidebar-text);
+            padding: 1.2rem 0.75rem;
+            position: fixed;
+            top: var(--topbar-height);
+            left: 0; bottom: 0;
+            overflow-y: auto;
+            z-index: 99;
+            border-right: 1px solid rgba(255,255,255,0.04);
+            transition: transform 0.3s ease;
+        }
+        .sidebar h2 {
+            font-size: 0.7rem;
+            color: var(--color-accent-light);
+            margin-bottom: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            padding-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        .sidebar ul { list-style: none; padding: 0; }
+        .sidebar ul li { margin-bottom: 0.15rem; }
+        .sidebar ul li a {
+            color: var(--color-sidebar-text);
+            text-decoration: none;
+            font-size: 0.88rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.6rem;
+            border-radius: 6px;
+            transition: background 0.2s, color 0.2s, padding-left 0.2s;
+            border-left: 3px solid transparent;
+        }
+        .sidebar ul li a:hover { background: var(--color-sidebar-hover); color: #fff; padding-left: 0.8rem; }
+        .sidebar ul li a.active { background: var(--color-sidebar-hover); color: var(--color-sidebar-active); border-left-color: var(--color-sidebar-active); font-weight: 600; }
+        .sidebar ul li a .nav-icon { font-size: 1rem; width: 1.4rem; text-align: center; opacity: 0.7; }
+        .sidebar ul li a.active .nav-icon { opacity: 1; }
+        .sidebar .nav-section { margin-bottom: 1.5rem; }
+        .breadcrumb { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 0.5rem; padding: 0.4rem 0; flex-wrap: wrap; }
+        .breadcrumb a { color: var(--color-accent); text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .breadcrumb .sep { color: var(--color-text-muted); font-size: 0.7rem; }
+        .breadcrumb .current { color: var(--color-text-light); font-weight: 500; }
+        .main-content {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            padding: 1.5rem 2.5rem 3rem;
+            max-width: 960px;
+        }
+        header {
+            background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 40%, #2a5a32 100%);
+            color: #fff;
+            padding: 2rem 2.5rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+        header::before {
+            content: '';
+            position: absolute;
+            top:0;left:0;right:0;bottom:0;
+            background: repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.015) 20px, rgba(255,255,255,0.015) 21px);
+            pointer-events: none;
+        }
+        header h1 { font-size: 2rem; margin-bottom: 0.3rem; color: #ffffff; position: relative; z-index: 1; }
+        header p { color: #c8dcc8; font-size: 0.95rem; position: relative; z-index: 1; max-width: 80%; }
+        h1, h2, h3, h4, h5, h6 { color: var(--color-primary); margin-top: 1.8rem; margin-bottom: 0.8rem; font-weight: 700; line-height: 1.3; }
+        h1 { font-size: 2rem; border-bottom: 2px solid var(--color-accent); padding-bottom: 0.5rem; }
+        h2 { font-size: 1.6rem; border-bottom: 2px solid var(--color-accent-light); padding-bottom: 0.3rem; }
+        h3 { font-size: 1.25rem; }
+        h4 { font-size: 1.05rem; }
+        h2, h3 { scroll-margin-top: calc(var(--topbar-height) + 1rem); }
+        h2 .section-anchor, h3 .section-anchor { opacity: 0; margin-left: 0.3rem; font-size: 0.8em; color: var(--color-accent); text-decoration: none; transition: opacity 0.2s; }
+        h2:hover .section-anchor, h3:hover .section-anchor { opacity: 1; }
+        p { margin-bottom: 1rem; }
+        a { color: var(--color-accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        ul, ol { margin-bottom: 1rem; padding-left: 2rem; }
+        li { margin-bottom: 0.3rem; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; font-size: 0.88rem; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        table th, table td { border: 1px solid var(--color-border); padding: 0.65rem 0.9rem; text-align: left; }
+        table th { background: var(--color-primary); color: #fff; font-weight: 600; font-size: 0.82rem; letter-spacing: 0.3px; text-transform: uppercase; }
+        table tr:nth-child(even) { background: #fafcfa; }
+        table tr:hover { background: #f0f5ec; transition: background 0.15s; }
+        pre { background: var(--color-code-bg); color: #e8e8e8; padding: 1rem 1rem 1rem 1.2rem; border-radius: 8px; overflow-x: auto; font-family: var(--font-code); font-size: 0.82rem; line-height: 1.55; margin-bottom: 1.5rem; position: relative; border-left: 3px solid var(--color-accent); }
+        code { font-family: var(--font-code); font-size: 0.85rem; background: #e8f0e4; padding: 0.15rem 0.4rem; border-radius: 3px; color: var(--color-primary); }
+        pre code { background: transparent; padding: 0; font-size: inherit; color: inherit; }
+        .copy-btn { position: absolute; top: 0.5rem; right: 0.5rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: #b0c0b0; cursor: pointer; font-size: 0.72rem; padding: 0.25rem 0.6rem; border-radius: 4px; opacity: 0; transition: opacity 0.2s, background 0.2s; font-family: var(--font-body); }
+        pre:hover .copy-btn { opacity: 1; }
+        .copy-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+        .copy-btn.copied { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
+        blockquote { border-left: 4px solid var(--color-accent); padding: 0.75rem 1.2rem; margin-bottom: 1rem; background: var(--color-info-bg); border-radius: 0 6px 6px 0; }
+        blockquote p { margin-bottom: 0; }
+        hr { border: none; border-top: 1px solid var(--color-border); margin: 2rem 0; }
+        .footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border); text-align: center; color: var(--color-text-muted); font-size: 0.82rem; }
+        .footer a { color: var(--color-accent); }
+        .footer-links { display: flex; justify-content: center; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.5rem; }
+        .footer-links a { padding: 0.2rem 0.5rem; }
+        .badge { display: inline-block; background: var(--color-accent); color: #fff; padding: 0.15rem 0.6rem; border-radius: 12px; font-size: 0.72rem; font-weight: 600; }
+        .mermaid-wrapper { position: relative; background: var(--color-sidebar-bg); border-radius: 10px; margin-bottom: 1.5rem; overflow: hidden; min-height: 300px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .mermaid-wrapper .mermaid { padding: 1.5rem; text-align: center; margin: 0; border-radius: 0; background: none; }
+        .mermaid-wrapper .mermaid svg { max-width: none; width: 100%; height: auto; cursor: grab; transform-origin: 0 0; }
+        .mermaid-wrapper .mermaid svg:active { cursor: grabbing; }
+        .zoom-toolbar { position: absolute; bottom: 10px; right: 10px; display: flex; gap: 4px; z-index: 10; opacity: 0.4; transition: opacity 0.2s; }
+        .mermaid-wrapper:hover .zoom-toolbar { opacity: 1; }
+        .zoom-toolbar button { width: 32px;height:32px; border:1px solid rgba(255,255,255,0.15); background:rgba(0,0,0,0.4); color:#e0e0e0; border-radius:4px; cursor:pointer; font-size:18px; line-height:1; display:flex; align-items:center; justify-content:center; transition:background .2s; user-select:none; backdrop-filter:blur(4px); }
+        .zoom-toolbar button:hover { background:rgba(0,0,0,0.6); border-color:var(--color-accent-light); }
+        .mermaid-caption { font-size:0.85rem; color:var(--color-text-muted); text-align:center; margin-top:-1rem; margin-bottom:1.5rem; font-style:italic; }
+        .diagram-img { max-width:100%; height:auto; border:1px solid var(--color-border); border-radius:10px; margin:1.5rem 0; box-shadow:0 3px 12px rgba(0,0,0,0.06); transition:transform .3s ease, box-shadow .3s ease; cursor:pointer; display:block; }
+        .diagram-img:hover { transform:scale(1.01); box-shadow:0 6px 24px rgba(0,0,0,0.1); }
+        .diagram-caption { text-align:center; font-style:italic; color:var(--color-text-muted); margin-top:-0.8rem; margin-bottom:1.5rem; font-size:0.85rem; }
+        .diagram-link { display:inline-block; background:var(--color-info-bg); border:1px solid var(--color-accent-light); border-radius:6px; padding:0.5rem 1rem; margin:0.2rem; color:var(--color-accent-dark); text-decoration:none; font-size:0.85rem; transition:background .2s, transform .2s; }
+        .diagram-link:hover { background:#dcedc8; text-decoration:none; transform:translateY(-1px); }
+        .lightbox { display:none; position:fixed; z-index:9999; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); align-items:center; justify-content:center; padding:2rem; }
+        .lightbox.open { display:flex; }
+        .lightbox img { max-width:95vw; max-height:90vh; border-radius:8px; box-shadow:0 8px 40px rgba(0,0,0,0.5); object-fit:contain; }
+        .lightbox .close-btn { position:absolute; top:1rem; right:1.5rem; color:#fff; font-size:2rem; cursor:pointer; background:rgba(255,255,255,0.1); width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:none; transition:background .2s; }
+        .lightbox .close-btn:hover { background:rgba(255,255,255,0.2); }
+        .lightbox .caption { position:absolute; bottom:1.5rem; left:50%; transform:translateX(-50%); color:#ccc; font-size:0.9rem; background:rgba(0,0,0,0.5); padding:0.4rem 1rem; border-radius:6px; max-width:80%; text-align:center; }
+        @media (max-width:768px) {
+            .topbar .hamburger { display:block; }
+            .topbar .project-tagline, .topbar .topbar-right { display:none; }
+            .sidebar { transform:translateX(-100%); }
+            .sidebar.open { transform:translateX(0); }
+            .main-content { margin-left:0; padding:1rem; }
+            header { padding:1.5rem; }
+            header h1 { font-size:1.4rem; }
+            header p { max-width:100%; }
+            table { font-size:0.78rem; }
+            table th, table td { padding:0.4rem 0.5rem; }
+            .lightbox { padding:1rem; }
+            pre { font-size:0.76rem; padding:0.8rem; }
+        }
+        @media (max-width:480px) {
+            .main-content { padding:0.75rem; }
+            header { padding:1.2rem; }
+            header h1 { font-size:1.2rem; }
+        }
+        @media print {
+            .sidebar, .topbar, .lightbox, .copy-btn, .zoom-toolbar { display:none !important; }
+            .main-content { margin-left:0; padding:0; }
+            body { padding-top:0; }
+            pre { white-space:pre-wrap; break-inside:avoid; }
+        }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <button class="hamburger" onclick="toggleSidebar()" aria-label="Abrir menu">&#9776;</button>
+        <span class="project-title">Payment Processor</span>
+        <span class="project-tagline">Sistema de Processamento de Pagamentos</span>
+        <div class="topbar-right"><span>v1.0.0</span></div>
+    </div>
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+    <nav class="sidebar" id="sidebar">
+        <div class="nav-section">
+            <h2>Payment Processor</h2>
+            <ul>
+                <li><a href="index.html"><span class="nav-icon">&#127968;</span> Início</a></li>
+                <li><a href="architecture.html" class="active"><span class="nav-icon">&#128202;</span> Arquitetura</a></li>
+                <li><a href="setup.html"><span class="nav-icon">&#9881;</span> Setup</a></li>
+                <li><a href="observability.html"><span class="nav-icon">&#128200;</span> Observabilidade</a></li>
+            </ul>
+        </div>
+        <div class="nav-section">
+            <h2>Features</h2>
+            <ul>
+                <li><a href="features/payment-consumer.html"><span class="nav-icon">&#9889;</span> Payment Consumer</a></li>
+                <li><a href="features/payment-ui.html"><span class="nav-icon">&#128187;</span> Payment UI</a></li>
+                <li><a href="features/cli-producer.html"><span class="nav-icon">&#128295;</span> CLI Producer</a></li>
+            </ul>
+        </div>
+    </nav>
+    <div class="main-content">
+        <div class="breadcrumb">
+            <a href="index.html">Início</a>
+            <span class="sep">/</span>
+            <span class="current">Arquitetura</span>
+        </div>
+        <header>
+            <h1>Arquitetura do Sistema</h1>
+            <p>Visão geral da arquitetura e decisões técnicas do Payment Processor.</p>
+        </header>
+
+        <h2 id="visao-geral">Visão Geral</h2>
+        <p>O <strong>Payment Processor</strong> é um sistema distribuído de processamento de pagamentos baseado em microsserviços e mensageria assíncrona. A arquitetura segue o padrão <strong>Event-Driven</strong> com Kafka como espinha dorsal.</p>
+
+        <h3 id="diagrama-de-componentes">Diagrama de Componentes</h3>
+        <pre>
+╔══════════════════════════════════════════════════════════════════════╗
+║                        KAFKA CLUSTER                                ║
+║                                                                      ║
+║  ┌──────────────────────────────────────┐  ┌──────────────────────┐  ║
+║  │  payment.events (3 partições)        │  │ payment.events.dlq   │  ║
+║  │  - Produtor: API externa, CLI        │  │  (1 partição)        │  ║
+║  │  - Consumidor: payment-consumer-group │  │  - Mensagens com     │  ║
+║  │  - Retenção: configurável             │  │    falha permanente   │  ║
+║  └────────────────┬─────────────────────┘  └──────────▲───────────┘  ║
+║                   │                                    │              ║
+╚═══════════════════│════════════════════════════════════│══════════════╝
+                    │                                    │
+          Publica   │                           Publica  │
+                    │                           (DLQ)   │
+    ┌───────────────┴──────────┐                         │
+    │                          │                         │
+    ▼                          │                         │
+┌──────────────────┐           │                         │
+│  CLI Producer    │           │                         │
+│  (cmd/producer)  │           │                         │
+│  SyncProducer    │           │                         │
+│  Valida antes    │           │                         │
+│  de publicar     │           │                         │
+└──────────────────┘           │                         │
+                               │                         │
+┌──────────────────────────────────────────────────────────────────────┐
+│                         CONSUMER SERVICE                             │
+│                         (cmd/consumer)                               │
+│                                                                      │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────────┐     │
+│  │  Validador     │  │  Idempotência  │  │  Status Updater    │     │
+│  │  (go-validator) │  │  (Redis SET NX)│  │  (Redis HSET)      │     │
+│  └────────┬───────┘  └───────┬────────┘  └──────────┬─────────┘     │
+│           │                  │                      │                │
+│  ┌────────┴──────────────────┴──────────────────────┴─────────┐     │
+│  │                    Retry Handler                             │     │
+│  │            (3 tentativas, backoff exp + jitter)              │     │
+│  └────────┬─────────────────────────────────────────────┬───────┘     │
+│           │                                              │           │
+│     ┌─────┴─────┐                                  ┌────┴────┐     │
+│     │  História  │                                  │   DLQ   │     │
+│     │  DynamoDB  │                                  │  Kafka  │     │
+│     └─────┬─────┘                                  └─────────┘     │
+└───────────│──────────────────────────────────────────────────────────┘
+            │
+            │ Eventos via Redis Pub/Sub (canal: payment:events)
+            │
+┌───────────▼──────────────────────────────────────────────────────────┐
+│                        PAYMENT UI                                    │
+│                        (cmd/ui)                                      │
+│                                                                      │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────────┐     │
+│  │  Event Bus     │  │  REST API      │  │  SSE Handler       │     │
+│  │  Redis Pub/Sub │  │  /api/payments │  │  /api/events       │     │
+│  │  + subscribers │  │  /api/metrics  │  │  heartbeat 30s     │     │
+│  └────────────────┘  └────────────────┘  └────────────────────┘     │
+│                                                                      │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │           Frontend (Vanilla JS + HTML + CSS)                 │    │
+│  │  ┌───────────┐  ┌────────────┐  ┌────────────┐              │    │
+│  │  │ Live Feed │  │ Payments   │  │ History    │              │    │
+│  │  │ (SSE)     │  │ Table      │  │ Modal      │              │    │
+│  │  └───────────┘  └────────────┘  └────────────┘              │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════╗
+║                     DATA STORES                                     ║
+║                                                                      ║
+║  ┌──────────────┐    ┌────────────────────┐    ┌────────────────┐   ║
+║  │    Redis     │    │     DynamoDB        │    │    Redis       │   ║
+║  │  (Status)    │    │  (Payment History)  │    │ (Idempotência) │   ║
+║  │  payment:id  │    │  payment_id (PK)    │    │ idempotency:id │   ║
+║  │  HSET fields │    │  timestamp (SK)     │    │ SET NX + TTL   │   ║
+║  │  TTL 7 dias  │    │  schemaless         │    │ TTL 24h        │   ║
+║  └──────────────┘    └────────────────────┘    └────────────────┘   ║
+╚══════════════════════════════════════════════════════════════════════╝
+        </pre>
+
+        <img src="diagrams/data-stores.jpg" alt="Diagrama dos data stores: Redis e DynamoDB" class="diagram-img" onclick="openLightbox(this)">
+        <p class="diagram-caption">Data Stores: Redis para status (payment:id HSET, TTL 7d) e idempotência (SET NX, TTL 24h), DynamoDB para histórico permanente (payment_id PK, timestamp SK).</p>
+
+        <h3 id="observabilidade-arch">Observabilidade</h3>
+        <pre>
+╔══════════════════════════════════════════════════════════════════════╗
+║                    OBSERVABILIDADE                                   ║
+║                                                                      ║
+║  ┌──────────────┐    ┌────────────────────┐    ┌────────────────┐   ║
+║  │  Logs (slog) │    │  Tracing (OTel)    │    │  Métricas      │   ║
+║  │  JSON output │    │  spans por mensagem│    │  counters +    │   ║
+║  │  stdout      │    │  OTLP gRPC export  │    │  histograms    │   ║
+║  └──────────────┘    └────────────────────┘    └────────────────┘   ║
+║                                                                      ║
+║  ┌──────────────────────────────────────────────────────────────┐    ║
+║  │           OpenTelemetry Collector                             │    ║
+║  │  OTLP Receiver → Batch Processor → Exporters (debug, Jaeger)  │    ║
+║  └──────────────────────────────────────────────────────────────┘    ║
+╚══════════════════════════════════════════════════════════════════════╝
+        </pre>
+
+        <img src="diagrams/observability-stack.jpg" alt="Diagrama da stack de observabilidade: OTel Collector, Jaeger, logs, métricas" class="diagram-img" onclick="openLightbox(this)">
+        <p class="diagram-caption">Stack de observabilidade: OpenTelemetry Collector com OTLP Receiver, Batch Processor e Exporters (debug, Jaeger). Logs estruturados via log/slog.</p>
+
+        <img src="diagrams/deployment-architecture.jpg" alt="Diagrama da arquitetura de deploy com Docker Compose" class="diagram-img" onclick="openLightbox(this)">
+        <p class="diagram-caption">Arquitetura de deployment: Kafka, Redis, Floci (DynamoDB Local), OTel Collector e Payment UI em containers Docker, com aplicações executadas localmente.</p>
+
+        <h3 id="diagrama-interativo">Diagrama Interativo da Arquitetura</h3>
+        <div class="mermaid-wrapper"><div class="mermaid">
+            graph TB
+                subgraph KafkaCluster["Kafka Cluster"]
+                    T["payment.events 3 partições Retenção configurável"]
+                    DLQ["payment.events.dlq 1 partição Mensagens c/ falha permanente"]
+                    CG["Consumer Group payment-consumer-group Escalabilidade horizontal"]
+                end
+                subgraph Producer["CLI Producer (cmd/producer)"]
+                    direction LR
+                    P1["SyncProducer Kafka sarama"]
+                    P2["Validação reusa validator do consumer"]
+                end
+                subgraph ConsumerSvc["Consumer Service (cmd/consumer)"]
+                    direction TB
+                    W["Worker Pool chan struct semaphore 10 goroutines"]
+                    H["Handler sarama ConsumerGroupHandler Cria spans + orquestra"]
+                    V["Validador go-playground/validator Schema + regras de negócio"]
+                    I["Idempotência Redis SET NX TTL 24h Fallback otimista"]
+                    S["Status Updater Redis HSET TTL 7d Pipeline atômico"]
+                    HST["History Recorder DynamoDB PutItem ConditionExpression"]
+                    R["Retry Handler 3 tentativas + jitter ±25% Backoff: 1x, 3x, 9x"]
+                    D["DLQ Producer Kafka headers trace_id + last_error"]
+                    W -.->|semáforo| H
+                    H --> V
+                    V -->|"inválido"| D
+                    V -->|"válido"| I
+                    I -->|"duplicado"| SKIP["Commit e skip"]
+                    I -->|"novo"| S
+                    S --> HST
+                    HST -->|"sucesso"| OK["Commit offset"]
+                    HST -->|"falha"| R
+                    R -->|"ok"| HST
+                    R -->|"exaurido"| D
+                end
+                subgraph UISvc["Payment UI (cmd/ui)"]
+                    direction LR
+                    SS["Static Files embed.FS"]
+                    API["REST API :8081/api/payments :8081/api/metrics"]
+                    SSE["SSE :8081/api/events heartbeat 30s"]
+                    EB["Event Bus buffer 256 subscribers map"]
+                    SS --> API
+                    SS --> SSE
+                    EB --> SSE
+                end
+                subgraph Stores["Data Stores"]
+                    R1["Redis Status payment:id HSET + TTL 7 dias"]
+                    R2["Redis Idempotency idempotency:id SET NX + TTL 24h"]
+                    DDB["DynamoDB payment_history payment_id PK + timestamp SK"]
+                    RP["Redis Pub/Sub canal: payment:events Event Bus desacoplado"]
+                end
+                subgraph Observability["Observabilidade"]
+                    OTC["OTel Collector :4317 gRPC Batch: 1s / 1024"]
+                    LOG["Logs JSON log/slog stdout"]
+                    TR["Tracing OTLP spans AlwaysSample"]
+                    MET["Métricas counters + histograms Leitor 10s"]
+                end
+                P1 -->|publica| T
+                P2 -.->|reusa| V
+                T -->|consome| H
+                D -->|publica| DLQ
+                S -->|persiste| R1
+                I -->|persiste| R2
+                HST -->|persiste| DDB
+                R1 -.->|consulta status| API
+                DDB -.->|consulta histórico| API
+                H -.->|evento| RP
+                RP -.->|assinatura| EB
+                H -.-> LOG
+                H -.-> TR
+                H -.-> MET
+                API -.-> LOG
+                click H "features/payment-consumer.html" "Ver documentação detalhada do Consumer"
+                click API "features/payment-ui.html" "Ver documentação detalhada da Payment UI"
+                click P1 "features/cli-producer.html" "Ver documentação detalhada do CLI Producer"
+                click OTC "observability.html" "Ver documentação de observabilidade"
+                click RP "features/payment-ui.html#event-bus" "Ver detalhes do Event Bus"
+                style T fill:#533483,stroke:#9b59b6,stroke-width:3px
+                style DLQ fill:#7b241c,stroke:#e74c3c,stroke-width:3px
+                style H fill:#558b2f,stroke:#8bc34a,stroke-width:3px
+                style V fill:#558b2f,stroke:#8bc34a
+                style I fill:#558b2f,stroke:#8bc34a
+                style S fill:#558b2f,stroke:#8bc34a
+                style HST fill:#558b2f,stroke:#8bc34a
+                style R fill:#7d6608,stroke:#f1c40f,stroke-width:3px
+                style D fill:#7b241c,stroke:#e74c3c,stroke-width:2px
+                style W fill:#33691e,stroke:#aed581
+                style SSE fill:#1e8449,stroke:#2ecc71,stroke-width:3px
+                style OTC fill:#515a5a,stroke:#808b96,stroke-width:2px
+                style R1 fill:#1a3a1a,stroke:#2ecc71,stroke-width:2px
+                style R2 fill:#1a3a1a,stroke:#2ecc71
+                style DDB fill:#1a2e1e,stroke:#8bc34a,stroke-width:2px
+                style RP fill:#1a3a1a,stroke:#2ecc71,stroke-dasharray:5 5
+                style LOG fill:#7d6608,stroke:#f1c40f
+                style TR fill:#533483,stroke:#9b59b6
+                style MET fill:#1e8449,stroke:#2ecc71
+                style SKIP fill:#1e8449,stroke:#2ecc71
+                style OK fill:#1e8449,stroke:#2ecc71
+                style CG fill:#533483,stroke:#9b59b6
+        </div>
+        <p class="mermaid-caption">Diagrama interativo completo da arquitetura. Clique nos componentes destacados (bordas mais grossas) para navegar até a documentação detalhada.</p>
+        </div>
+
+        <div class="mermaid-wrapper"><div class="mermaid">
+            sequenceDiagram
+                participant CLI as CLI Producer
+                participant K as Kafka
+                participant C as Consumer
+                participant R as Redis
+                participant D as DynamoDB
+                participant EB as Event Bus
+                participant U as Payment UI
+                participant B as Navegador
+
+                CLI->>K: publish(payment_event)
+                activate K
+                K->>C: consume(evento)
+                activate C
+                Note over C: valida + idempotência
+                C->>R: status(idemp+status)
+                activate R
+                R-->>C: ok
+                deactivate R
+                C->>D: histórico PutItem
+                activate D
+                alt sucesso
+                    D-->>C: ok
+                else falha
+                    Note over C: retry 3x + backoff
+                    C->>K: DLQ
+                end
+                deactivate D
+                C-->>EB: evento (Redis Pub/Sub)
+                deactivate C
+                deactivate K
+                EB->>U: encaminha evento
+                activate U
+                U->>B: SSE stream heartbeat 30s
+                deactivate U
+                B->>U: GET /api/payments
+                activate U
+                U->>R: consulta Redis SCAN
+                U->>D: consulta DynamoDB
+                U-->>B: JSON response
+                deactivate U
+                Note over CLI,B: Health checks: /healthz /readyz Graceful shutdown: SIGTERM
+        </div>
+        <p class="mermaid-caption">Diagrama de sequência UML — Interação entre todos os componentes distribuídos, incluindo health checks e graceful shutdown.</p>
+        </div>
+
+        <h2 id="fluxo-de-dados">Fluxo de Dados Detalhado</h2>
+
+        <h3 id="publicacao-de-evento">1. Publicação de Evento</h3>
+        <pre>
+[ Origem ] → Kafka Topic (payment.events)
+             ├── CLI Producer (cmd/producer)
+             │   ├── Valida no cliente (reusa validator)
+             │   ├── Publica via SyncProducer
+             │   └── Confirma partition + offset
+             │
+             └── API Externa / Gateway (fora do escopo)
+                 ├── Publica no mesmo tópico
+                 └── Mensagens seguem schema definido
+        </pre>
+
+        <h3 id="processamento-consumer">2. Processamento (Consumer)</h3>
+        <pre>
+Kafka Message
+    │
+    ▼
+1. Acquire semaphore (worker pool)
+    │
+    ▼
+2. Validate payload
+    ├── Sucesso → continua
+    └── Falha  → DLQ (erro permanente)
+    │
+    ▼
+3. Idempotency Check (Redis)
+    ├── Já processado → commit offset (skip)
+    └── Novo → MarkProcessed (SET NX, TTL 24h)
+    │
+    ▼
+4. Retry.Do (3 tentativas com backoff)
+    ├── Atualiza Status (Redis HSET)
+    ├── Registra Histórico (DynamoDB PutItem)
+    │
+    ├── Sucesso → commit offset
+    └── Falha (exaustão) → DLQ
+        </pre>
+
+        <img src="diagrams/message-processing-flow.jpg" alt="Diagrama do fluxo de processamento de mensagens do Consumer" class="diagram-img" onclick="openLightbox(this)">
+        <p class="diagram-caption">Pipeline de processamento: validação, idempotência, status update, histórico DynamoDB, retry com backoff e Dead Letter Queue.</p>
+
+        <h3 id="consulta-ui">3. Consulta (UI)</h3>
+        <pre>
+Browser
+    │
+    ├── GET / → index.html (embed.FS)
+    │
+    ├── GET /api/payments
+    │   └── Redis: SCAN payment:* → HGETALL
+    │
+    ├── GET /api/payments/{id}/history
+    │   └── DynamoDB: Query por payment_id
+    │
+    ├── GET /api/metrics
+    │   └── Redis: SCAN + contagem por status
+    │
+    └── GET /api/events (SSE)
+        └── EventBus ← Redis Pub/Sub (canal payment:events)
+        </pre>
+
+        <h2 id="padroes-distribuidos">Padrões Distribuídos Utilizados</h2>
+        <table>
+            <thead>
+                <tr><th>Padrão</th><th>Implementação</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><strong>Event-Driven</strong></td><td>Kafka como message broker central</td></tr>
+                <tr><td><strong>Consumer Group</strong></td><td><code>payment-consumer-group</code> para escalabilidade</td></tr>
+                <tr><td><strong>Idempotência</strong></td><td>Redis <code>SET NX</code> + DynamoDB <code>ConditionExpression</code></td></tr>
+                <tr><td><strong>Retry with Backoff</strong></td><td>Exponencial (1x, 3x, 9x) + jitter (±25%)</td></tr>
+                <tr><td><strong>Dead Letter Queue</strong></td><td>Tópico Kafka dedicado <code>payment.events.dlq</code></td></tr>
+                <tr><td><strong>Worker Pool</strong></td><td>Semáforo com <code>chan struct{}</code> (configurável)</td></tr>
+                <tr><td><strong>Circuit Breaker</strong></td><td>Preparado para DynamoDB (gobreaker)</td></tr>
+                <tr><td><strong>Graceful Shutdown</strong></td><td>Context cancellation + signal handling</td></tr>
+                <tr><td><strong>Health Check</strong></td><td>Endpoints <code>/healthz</code> e <code>/readyz</code></td></tr>
+                <tr><td><strong>Server-Sent Events</strong></td><td>Streaming de eventos em tempo real para o browser</td></tr>
+                <tr><td><strong>Pub/Sub</strong></td><td>Redis Pub/Sub para desacoplar consumer e UI</td></tr>
+                <tr><td><strong>Observabilidade</strong></td><td>OpenTelemetry (tracing + métricas + logs)</td></tr>
+            </tbody>
+        </table>
+
+        <h2 id="decisoes-arquiteturais">Decisões Arquiteturais (ADRs)</h2>
+
+        <h3 id="adr-001">ADR-001: Kafka como Message Broker</h3>
+        <ul>
+            <li><strong>Contexto</strong>: Necessário sistema de mensageria distribuído com garantia at-least-once</li>
+            <li><strong>Decisão</strong>: Kafka (via sarama)</li>
+            <li><strong>Justificativa</strong>: Maduro, consumer groups, partições para paralelismo, retenção configurável</li>
+        </ul>
+
+        <h3 id="adr-002">ADR-002: Redis para Idempotência e Status</h3>
+        <ul>
+            <li><strong>Contexto</strong>: Necessário armazenamento de baixa latência para verificação de idempotência e status</li>
+            <li><strong>Decisão</strong>: Redis</li>
+            <li><strong>Justificativa</strong>: <code>SET NX</code> atômico, TTL nativo, latência sub-milissegundo, pipeline</li>
+        </ul>
+
+        <h3 id="adr-003">ADR-003: DynamoDB para Histórico</h3>
+        <ul>
+            <li><strong>Contexto</strong>: Necessário armazenamento permanente e escalável</li>
+            <li><strong>Decisão</strong>: DynamoDB</li>
+            <li><strong>Justificativa</strong>: Gerenciado, escalável, <code>ConditionExpression</code> nativa, schemaless</li>
+        </ul>
+
+        <h3 id="adr-004">ADR-004: Retry Síncrono (não republicar no Kafka)</h3>
+        <ul>
+            <li><strong>Contexto</strong>: Mensagens com falha recuperável precisam ser retentadas</li>
+            <li><strong>Decisão</strong>: Retry síncrono com backoff exponencial</li>
+            <li><strong>Justificativa</strong>: Simplicidade, evita loops de repúblicação, preserva ordenação</li>
+        </ul>
+
+        <h3 id="adr-005">ADR-005: SSE para Streaming em Tempo Real</h3>
+        <ul>
+            <li><strong>Contexto</strong>: UI precisa exibir eventos em tempo real</li>
+            <li><strong>Decisão</strong>: Server-Sent Events (SSE)</li>
+            <li><strong>Justificativa</strong>: Unidirecional (suficiente), reconexão automática nativa, implementação simples</li>
+        </ul>
+
+        <h3 id="adr-006">ADR-006: Redis Pub/Sub como Event Bus</h3>
+        <ul>
+            <li><strong>Contexto</strong>: Consumer e UI em processos separados precisam compartilhar eventos</li>
+            <li><strong>Decisão</strong>: Redis Pub/Sub (canal <code>payment:events</code>)</li>
+            <li><strong>Justificativa</strong>: Redis já é dependência, Pub/Sub leve, sem acoplamento direto</li>
+        </ul>
+
+        <img src="diagrams/event-bus-flow.jpg" alt="Diagrama do fluxo do Event Bus via Redis Pub/Sub" class="diagram-img" onclick="openLightbox(this)">
+        <p class="diagram-caption">Fluxo do Event Bus: Consumer publica eventos no Redis Pub/Sub, Payment UI assina o canal e encaminha para conexões SSE.</p>
+
+        <h3 id="adr-007">ADR-007: CLI Separada do Consumer</h3>
+        <ul>
+            <li><strong>Contexto</strong>: Ferramenta de publicação de eventos para testes</li>
+            <li><strong>Decisão</strong>: Binário separado (<code>cmd/producer</code>)</li>
+            <li><strong>Justificativa</strong>: Independência, sem acoplamento, consumer não ganha dependência de CLI</li>
+        </ul>
+
+        <h3 id="adr-008">ADR-008: Consistência Eventual</h3>
+        <ul>
+            <li><strong>Contexto</strong>: Status no Redis vs histórico no DynamoDB</li>
+            <li><strong>Decisão</strong>: Consistência eventual entre Redis (status) e DynamoDB (histórico)</li>
+            <li><strong>Justificativa</strong>: Baixa latência, alta disponibilidade. Reconciliação pode ser feita externamente</li>
+        </ul>
+
+        <h2 id="tradeoffs">Tradeoffs</h2>
+        <table>
+            <thead>
+                <tr><th>Decisão</th><th>Prós</th><th>Contras</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><strong>Consistência eventual</strong></td><td>Baixa latência, tolerante a falhas</td><td>Risco de leitura defasada</td></tr>
+                <tr><td><strong>TTL idempotência 24h</strong></td><td>Simples, automático</td><td>Mensagens &gt;24h podem ser reprocessadas</td></tr>
+                <tr><td><strong>Worker pool fixo</strong></td><td>Previsível, controlado</td><td>Subutilização em baixa carga</td></tr>
+                <tr><td><strong>Validação restritiva</strong></td><td>Dados garantidos, segurança</td><td>Mensagens fora do formato são rejeitadas</td></tr>
+                <tr><td><strong>Vanilla JS na UI</strong></td><td>Zero dependências, sem build step</td><td>Mais código manual</td></tr>
+            </tbody>
+        </table>
+
+        <h2 id="seguranca">Segurança</h2>
+        <ul>
+            <li><strong>Secrets</strong>: via variáveis de ambiente (nunca hardcoded)</li>
+            <li><strong>Payload validation</strong>: limite de 10 KB, sem caracteres de controle</li>
+            <li><strong>Logs</strong>: sem dados sensíveis (amount, descrições completas)</li>
+            <li><strong>Headers de segurança</strong>: <code>X-Content-Type-Options</code>, <code>X-Frame-Options</code>, <code>Referrer-Policy</code></li>
+            <li><strong>Path traversal</strong>: prevenido pelo <code>embed.FS</code></li>
+        </ul>
+
+        <div class="footer">
+            <p>Payment Processor - Documentação Técnica</p>
+            <div class="footer-links">
+                <a href="index.html">Início</a>
+                <a href="architecture.html">Arquitetura</a>
+                <a href="setup.html">Setup</a>
+                <a href="observability.html">Observabilidade</a>
+                <a href="features/payment-consumer.html">Consumer</a>
+                <a href="features/payment-ui.html">UI</a>
+                <a href="features/cli-producer.html">CLI</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+        <button class="close-btn" onclick="closeLightboxDirect()">&times;</button>
+        <img id="lightboxImg" src="" alt="">
+        <div class="caption" id="lightboxCaption"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true, securityLevel: 'loose', theme: 'dark',
+            themeVariables: {
+                primaryColor: '#1a2e20', primaryTextColor: '#e0e0e0', primaryBorderColor: '#4a5a4a',
+                lineColor: '#6a7a6a', secondaryColor: '#1a3620', tertiaryColor: '#33691e', fontSize: '14px'
+            },
+            flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' }
+        });
+        function openLightbox(img) {
+            var lb=document.getElementById('lightbox'), lbImg=document.getElementById('lightboxImg'), lbCap=document.getElementById('lightboxCaption');
+            lbImg.src=img.src;
+            var cap=img.nextElementSibling;
+            if(cap&&cap.classList.contains('diagram-caption')) lbCap.textContent=cap.textContent; else lbCap.textContent='';
+            lb.classList.add('open'); document.body.style.overflow='hidden';
+        }
+        function closeLightbox(e) { if(e.target===e.currentTarget) closeLightboxDirect(); }
+        function closeLightboxDirect() { document.getElementById('lightbox').classList.remove('open'); document.body.style.overflow=''; }
+        document.addEventListener('keydown',function(e){if(e.key==='Escape')closeLightboxDirect();});
+        function addCopyButtons(){document.querySelectorAll('pre').forEach(function(pre){if(pre.querySelector('.copy-btn'))return;var btn=document.createElement('button');btn.className='copy-btn';btn.textContent='Copy';btn.onclick=function(){var code=pre.querySelector('code'),text=code?code.textContent:pre.textContent;navigator.clipboard.writeText(text).then(function(){btn.textContent='Copied!';btn.classList.add('copied');setTimeout(function(){btn.textContent='Copy';btn.classList.remove('copied')},2000)}).catch(function(){btn.textContent='Failed';setTimeout(function(){btn.textContent='Copy'},2000)})};pre.appendChild(btn)})}
+        function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebarOverlay').classList.toggle('open')}
+        function initZoom(){var wrappers=document.querySelectorAll('.mermaid-wrapper');if(wrappers.length===0){setTimeout(initZoom,300);return}wrappers.forEach(function(wrapper){var svg=wrapper.querySelector('svg');if(!svg)return;svg.style.transformOrigin='0 0';var scale=1,tx=0,ty=0,panning=false,sx=0,sy=0;function update(){svg.style.transform='translate('+tx+'px,'+ty+'px) scale('+scale+')'};var tb=document.createElement('div');tb.className='zoom-toolbar';var bi=document.createElement('button');bi.textContent='+';bi.onclick=function(){scale=Math.min(scale*1.4,10);update()};var bo=document.createElement('button');bo.textContent='−';bo.onclick=function(){scale=Math.max(scale/1.4,0.3);update()};var br=document.createElement('button');br.textContent='↺';br.onclick=function(){scale=1;tx=0;ty=0;update()};tb.appendChild(bi);tb.appendChild(bo);tb.appendChild(br);wrapper.appendChild(tb);svg.addEventListener('mousedown',function(e){panning=true;sx=e.clientX-tx;sy=e.clientY-ty;svg.style.cursor='grabbing'});document.addEventListener('mousemove',function(e){if(!panning)return;tx=e.clientX-sx;ty=e.clientY-sy;update()});document.addEventListener('mouseup',function(){panning=false;svg.style.cursor='grab'});wrapper.addEventListener('wheel',function(e){e.preventDefault();var d=e.deltaY>0?1/1.1:1.1;scale=Math.max(0.3,Math.min(10,scale*d));update()},{passive:false})})}
+        if(document.readyState==='complete'){setTimeout(function(){initZoom();addCopyButtons()},500)}else{window.addEventListener('load',function(){setTimeout(function(){initZoom();addCopyButtons()},500)})}
+    </script>
+</body>
+</html>

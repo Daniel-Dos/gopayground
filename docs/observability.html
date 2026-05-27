@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Observabilidade - Payment Processor</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --color-primary: #1a3620;
+            --color-primary-dark: #0f2414;
+            --color-primary-light: #2a5a32;
+            --color-accent: #7cb342;
+            --color-accent-light: #aed581;
+            --color-accent-dark: #558b2f;
+            --color-bg: #f5f7f0;
+            --color-card: #ffffff;
+            --color-text: #2d3a2d;
+            --color-text-light: #5a6a5a;
+            --color-text-muted: #8a9a8a;
+            --color-sidebar-bg: #1a3620;
+            --color-sidebar-hover: #0f2414;
+            --color-sidebar-text: #c8dcc8;
+            --color-sidebar-active: #7cb342;
+            --color-code-bg: #1e2a1e;
+            --color-border: #dce4d4;
+            --color-info-bg: #f1f8e9;
+            --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            --font-code: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+            --sidebar-width: 260px;
+            --topbar-height: 48px;
+        }
+        html { scroll-behavior: smooth; }
+        body { font-family:var(--font-body); background:var(--color-bg); color:var(--color-text); line-height:1.7; display:flex; min-height:100vh; padding-top:var(--topbar-height); }
+        .topbar { position:fixed; top:0; left:0; right:0; height:var(--topbar-height); background:var(--color-primary-dark); color:#e8f0e8; display:flex; align-items:center; padding:0 1rem; z-index:200; border-bottom:1px solid rgba(255,255,255,0.06); gap:0.75rem; }
+        .topbar .hamburger { display:none; background:none; border:none; color:#e8f0e8; font-size:1.4rem; cursor:pointer; padding:0.25rem 0.5rem; border-radius:4px; }
+        .topbar .hamburger:hover { background:rgba(255,255,255,0.1); }
+        .topbar .project-title { font-weight:700; font-size:0.95rem; letter-spacing:0.5px; }
+        .topbar .project-tagline { font-size:0.78rem; color:#9ab89a; margin-left:0.5rem; }
+        .topbar .project-tagline::before { content:"— "; }
+        .topbar .topbar-right { margin-left:auto; font-size:0.78rem; color:#9ab89a; }
+        .sidebar-overlay { display:none; position:fixed; top:0;left:0;right:0;bottom:0; background:rgba(0,0,0,0.4); z-index:98; }
+        .sidebar-overlay.open { display:block; }
+        .sidebar { width:var(--sidebar-width); background:var(--color-sidebar-bg); color:var(--color-sidebar-text); padding:1.2rem 0.75rem; position:fixed; top:var(--topbar-height); left:0; bottom:0; overflow-y:auto; z-index:99; border-right:1px solid rgba(255,255,255,0.04); transition:transform .3s ease; }
+        .sidebar h2 { font-size:0.7rem; color:var(--color-accent-light); margin-bottom:0.6rem; text-transform:uppercase; letter-spacing:1.5px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:0.5rem; font-weight:600; }
+        .sidebar ul { list-style:none; padding:0; }
+        .sidebar ul li { margin-bottom:0.15rem; }
+        .sidebar ul li a { color:var(--color-sidebar-text); text-decoration:none; font-size:0.88rem; display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0.6rem; border-radius:6px; transition:background .2s,color .2s,padding-left .2s; border-left:3px solid transparent; }
+        .sidebar ul li a:hover { background:var(--color-sidebar-hover); color:#fff; padding-left:0.8rem; }
+        .sidebar ul li a.active { background:var(--color-sidebar-hover); color:var(--color-sidebar-active); border-left-color:var(--color-sidebar-active); font-weight:600; }
+        .sidebar ul li a .nav-icon { font-size:1rem; width:1.4rem; text-align:center; opacity:0.7; }
+        .sidebar ul li a.active .nav-icon { opacity:1; }
+        .sidebar .nav-section { margin-bottom:1.5rem; }
+        .breadcrumb { display:flex; align-items:center; gap:0.4rem; font-size:0.8rem; color:var(--color-text-muted); margin-bottom:0.5rem; padding:0.4rem 0; flex-wrap:wrap; }
+        .breadcrumb a { color:var(--color-accent); text-decoration:none; }
+        .breadcrumb a:hover { text-decoration:underline; }
+        .breadcrumb .sep { color:var(--color-text-muted); font-size:0.7rem; }
+        .breadcrumb .current { color:var(--color-text-light); font-weight:500; }
+        .main-content { margin-left:var(--sidebar-width); flex:1; padding:1.5rem 2.5rem 3rem; max-width:960px; }
+        header { background:linear-gradient(135deg,var(--color-primary-dark) 0%,var(--color-primary) 40%,#2a5a32 100%); color:#fff; padding:2rem 2.5rem; border-radius:10px; margin-bottom:2rem; position:relative; overflow:hidden; }
+        header::before { content:''; position:absolute; top:0;left:0;right:0;bottom:0; background:repeating-linear-gradient(45deg,transparent,transparent 20px,rgba(255,255,255,0.015) 20px,rgba(255,255,255,0.015) 21px); pointer-events:none; }
+        header h1 { font-size:2rem; margin-bottom:0.3rem; color:#ffffff; position:relative; z-index:1; }
+        header p { color:#c8dcc8; font-size:0.95rem; position:relative; z-index:1; max-width:80%; }
+        h1, h2, h3, h4, h5, h6 { color:var(--color-primary); margin-top:1.8rem; margin-bottom:0.8rem; font-weight:700; line-height:1.3; }
+        h1 { font-size:2rem; border-bottom:2px solid var(--color-accent); padding-bottom:0.5rem; }
+        h2 { font-size:1.6rem; border-bottom:2px solid var(--color-accent-light); padding-bottom:0.3rem; }
+        h3 { font-size:1.25rem; }
+        h4 { font-size:1.05rem; }
+        h2, h3 { scroll-margin-top:calc(var(--topbar-height) + 1rem); }
+        p { margin-bottom:1rem; }
+        a { color:var(--color-accent); text-decoration:none; }
+        a:hover { text-decoration:underline; }
+        ul, ol { margin-bottom:1rem; padding-left:2rem; }
+        li { margin-bottom:0.3rem; }
+        table { width:100%; border-collapse:collapse; margin-bottom:1.5rem; font-size:0.88rem; border-radius:8px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.04); }
+        table th, table td { border:1px solid var(--color-border); padding:0.65rem 0.9rem; text-align:left; }
+        table th { background:var(--color-primary); color:#fff; font-weight:600; font-size:0.82rem; letter-spacing:0.3px; text-transform:uppercase; }
+        table tr:nth-child(even) { background:#fafcfa; }
+        table tr:hover { background:#f0f5ec; transition:background .15s; }
+        pre { background:var(--color-code-bg); color:#e8e8e8; padding:1rem 1rem 1rem 1.2rem; border-radius:8px; overflow-x:auto; font-family:var(--font-code); font-size:0.82rem; line-height:1.55; margin-bottom:1.5rem; position:relative; border-left:3px solid var(--color-accent); }
+        code { font-family:var(--font-code); font-size:0.85rem; background:#e8f0e4; padding:0.15rem 0.4rem; border-radius:3px; color:var(--color-primary); }
+        pre code { background:transparent; padding:0; font-size:inherit; color:inherit; }
+        .copy-btn { position:absolute; top:0.5rem; right:0.5rem; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:#b0c0b0; cursor:pointer; font-size:0.72rem; padding:0.25rem 0.6rem; border-radius:4px; opacity:0; transition:opacity .2s,background .2s; font-family:var(--font-body); }
+        pre:hover .copy-btn { opacity:1; }
+        .copy-btn:hover { background:rgba(255,255,255,0.15); color:#fff; }
+        .copy-btn.copied { background:var(--color-accent); color:#fff; border-color:var(--color-accent); }
+        blockquote { border-left:4px solid var(--color-accent); padding:0.75rem 1.2rem; margin-bottom:1rem; background:var(--color-info-bg); border-radius:0 6px 6px 0; }
+        blockquote p { margin-bottom:0; }
+        hr { border:none; border-top:1px solid var(--color-border); margin:2rem 0; }
+        .footer { margin-top:3rem; padding-top:1.5rem; border-top:1px solid var(--color-border); text-align:center; color:var(--color-text-muted); font-size:0.82rem; }
+        .footer a { color:var(--color-accent); }
+        .footer-links { display:flex; justify-content:center; gap:0.4rem; flex-wrap:wrap; margin-top:0.5rem; }
+        .footer-links a { padding:0.2rem 0.5rem; }
+        .mermaid-wrapper { position:relative; background:var(--color-sidebar-bg); border-radius:10px; margin-bottom:1.5rem; overflow:hidden; min-height:300px; box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+        .mermaid-wrapper .mermaid { padding:1.5rem; text-align:center; margin:0; border-radius:0; background:none; }
+        .mermaid-wrapper .mermaid svg { max-width:none; width:100%; height:auto; cursor:grab; transform-origin:0 0; }
+        .mermaid-wrapper .mermaid svg:active { cursor:grabbing; }
+        .zoom-toolbar { position:absolute; bottom:10px; right:10px; display:flex; gap:4px; z-index:10; opacity:0.4; transition:opacity .2s; }
+        .mermaid-wrapper:hover .zoom-toolbar { opacity:1; }
+        .zoom-toolbar button { width:32px; height:32px; border:1px solid rgba(255,255,255,0.15); background:rgba(0,0,0,0.4); color:#e0e0e0; border-radius:4px; cursor:pointer; font-size:18px; line-height:1; display:flex; align-items:center; justify-content:center; transition:background .2s; user-select:none; backdrop-filter:blur(4px); }
+        .zoom-toolbar button:hover { background:rgba(0,0,0,0.6); border-color:var(--color-accent-light); }
+        .mermaid-caption { font-size:0.85rem; color:var(--color-text-muted); text-align:center; margin-top:-1rem; margin-bottom:1.5rem; font-style:italic; }
+        .diagram-img { max-width:100%; height:auto; border:1px solid var(--color-border); border-radius:10px; margin:1.5rem 0; box-shadow:0 3px 12px rgba(0,0,0,0.06); transition:transform .3s ease,box-shadow .3s ease; cursor:pointer; display:block; }
+        .diagram-img:hover { transform:scale(1.01); box-shadow:0 6px 24px rgba(0,0,0,0.1); }
+        .diagram-caption { text-align:center; font-style:italic; color:var(--color-text-muted); margin-top:-0.8rem; margin-bottom:1.5rem; font-size:0.85rem; }
+        .lightbox { display:none; position:fixed; z-index:9999; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); align-items:center; justify-content:center; padding:2rem; }
+        .lightbox.open { display:flex; }
+        .lightbox img { max-width:95vw; max-height:90vh; border-radius:8px; box-shadow:0 8px 40px rgba(0,0,0,0.5); object-fit:contain; }
+        .lightbox .close-btn { position:absolute; top:1rem; right:1.5rem; color:#fff; font-size:2rem; cursor:pointer; background:rgba(255,255,255,0.1); width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:none; transition:background .2s; }
+        .lightbox .close-btn:hover { background:rgba(255,255,255,0.2); }
+        .lightbox .caption { position:absolute; bottom:1.5rem; left:50%; transform:translateX(-50%); color:#ccc; font-size:0.9rem; background:rgba(0,0,0,0.5); padding:0.4rem 1rem; border-radius:6px; max-width:80%; text-align:center; }
+        @media (max-width:768px) { .topbar .hamburger { display:block; } .topbar .project-tagline, .topbar .topbar-right { display:none; } .sidebar { transform:translateX(-100%); } .sidebar.open { transform:translateX(0); } .main-content { margin-left:0; padding:1rem; } header { padding:1.5rem; } header h1 { font-size:1.4rem; } header p { max-width:100%; } table { font-size:0.78rem; } table th, table td { padding:0.4rem 0.5rem; } .lightbox { padding:1rem; } pre { font-size:0.76rem; padding:0.8rem; } }
+        @media (max-width:480px) { .main-content { padding:0.75rem; } header { padding:1.2rem; } header h1 { font-size:1.2rem; } }
+        @media print { .sidebar, .topbar, .lightbox, .copy-btn, .zoom-toolbar { display:none !important; } .main-content { margin-left:0; padding:0; } body { padding-top:0; } pre { white-space:pre-wrap; break-inside:avoid; } }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <button class="hamburger" onclick="toggleSidebar()" aria-label="Abrir menu">&#9776;</button>
+        <span class="project-title">Payment Processor</span>
+        <span class="project-tagline">Sistema de Processamento de Pagamentos</span>
+        <div class="topbar-right"><span>v1.0.0</span></div>
+    </div>
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+    <nav class="sidebar" id="sidebar">
+        <div class="nav-section">
+            <h2>Payment Processor</h2>
+            <ul>
+                <li><a href="index.html"><span class="nav-icon">&#127968;</span> Início</a></li>
+                <li><a href="architecture.html"><span class="nav-icon">&#128202;</span> Arquitetura</a></li>
+                <li><a href="setup.html"><span class="nav-icon">&#9881;</span> Setup</a></li>
+                <li><a href="observability.html" class="active"><span class="nav-icon">&#128200;</span> Observabilidade</a></li>
+            </ul>
+        </div>
+        <div class="nav-section">
+            <h2>Features</h2>
+            <ul>
+                <li><a href="features/payment-consumer.html"><span class="nav-icon">&#9889;</span> Payment Consumer</a></li>
+                <li><a href="features/payment-ui.html"><span class="nav-icon">&#128187;</span> Payment UI</a></li>
+                <li><a href="features/cli-producer.html"><span class="nav-icon">&#128295;</span> CLI Producer</a></li>
+            </ul>
+        </div>
+    </nav>
+    <div class="main-content">
+        <div class="breadcrumb">
+            <a href="index.html">Início</a>
+            <span class="sep">/</span>
+            <span class="current">Observabilidade</span>
+        </div>
+        <header>
+            <h1>Observabilidade</h1>
+            <p>Documentação completa sobre logs, tracing, métricas e health checks do Payment Processor.</p>
+        </header>
+
+        <h2 id="visao-geral">Visão Geral</h2>
+        <p>O sistema utiliza <strong>OpenTelemetry</strong> como padrão para observabilidade distribuída, combinando três pilares:</p>
+        <ol>
+            <li><strong>Logs estruturados</strong> — via <code>log/slog</code> com formato JSON</li>
+            <li><strong>Tracing distribuído</strong> — spans para cada operação com exportação OTLP</li>
+            <li><strong>Métricas</strong> — counters e histograms exportados via OTLP</li>
+        </ol>
+
+        <img src="diagrams/observability-stack.jpg" alt="Diagrama da stack de observabilidade" class="diagram-img" onclick="openLightbox(this)">
+        <p class="diagram-caption">Stack de observabilidade: OpenTelemetry Collector com OTLP Receiver, Batch Processor e Exporters (debug, Jaeger). Logs estruturados via log/slog.</p>
+
+        <h3 id="diagrama-interativo">Diagrama Interativo da Observabilidade</h3>
+        <div class="mermaid-wrapper"><div class="mermaid">
+            graph TB
+                subgraph Apps["Aplicações"]
+                    C["Consumer Service cmd/consumer :8080 /healthz /readyz"]
+                    U_L["Payment UI cmd/ui :8081 /healthz"]
+                    P["CLI Producer cmd/producer"]
+                end
+                subgraph Health["Health Checks"]
+                    HC_C["Consumer healthz → 200 (sempre) readyz → Redis + DynamoDB"]
+                    HC_U["UI healthz → Redis Ping 200 ok / 503 down"]
+                end
+                subgraph Pillars["Três Pilares da Observabilidade"]
+                    L["Logs log/slog JSON stdout Campos: payment_id, trace_id, level"]
+                    T["Tracing OTLP spans Hierarquia: process_message → validate → idempotency → retry.do → dlq.publish"]
+                    M["Métricas Counters + Histograms messages_received messages_processed processing_duration retry_attempts dlq_published"]
+                end
+                subgraph Collector["OpenTelemetry Collector"]
+                    OTLP_R["OTLP Receiver gRPC :4317 HTTP :4318"]
+                    BP["Batch Processor timeout: 1s batch size: 1024"]
+                    EXP["Exporters debug (stdout) verbosity: detailed"]
+                    FUT["Futuro Jaeger (tracing) Prometheus (métricas)"]
+                end
+                C -->|logs| L
+                C -->|tracing| T
+                C -->|métricas| M
+                U_L -->|logs| L
+                U_L -->|métricas| M
+                P -->|logs| L
+                HC_C -.->|readyz| C
+                HC_U -.->|healthz| U_L
+                T -->|"OTLP gRPC"| OTLP_R
+                M -->|"OTLP gRPC"| OTLP_R
+                OTLP_R --> BP
+                BP --> EXP
+                EXP -.->|futuro| FUT
+                click C "features/payment-consumer.html" "Ver documentação do Consumer"
+                click U_L "features/payment-ui.html" "Ver documentação da UI"
+                click HC_C "observability.html#health-checks" "Ver health checks detalhados"
+                click HC_U "observability.html#health-checks" "Ver health checks detalhados"
+                style C fill:#558b2f,stroke:#8bc34a,stroke-width:3px
+                style U_L fill:#558b2f,stroke:#8bc34a,stroke-width:2px
+                style P fill:#33691e,stroke:#aed581
+                style HC_C fill:#558b2f,stroke:#2ecc71
+                style HC_U fill:#558b2f,stroke:#2ecc71
+                style L fill:#7d6608,stroke:#f1c40f,stroke-width:2px
+                style T fill:#533483,stroke:#9b59b6,stroke-width:3px
+                style M fill:#1e8449,stroke:#2ecc71,stroke-width:2px
+                style OTLP_R fill:#515a5a,stroke:#808b96,stroke-width:3px
+                style BP fill:#515a5a,stroke:#808b96,stroke-width:2px
+                style EXP fill:#515a5a,stroke:#808b96,stroke-width:2px
+                style FUT fill:#1a2e1e,stroke:#8bc34a,stroke-dasharray:8 4
+        </div>
+        <p class="mermaid-caption">Pipeline de observabilidade: 3 pilares (logs, tracing, métricas) → OTel Collector → destinos. Health checks em cada aplicação.</p>
+        </div>
+
+        <div class="mermaid-wrapper"><div class="mermaid">
+            sequenceDiagram
+                participant C as Consumer
+                participant U as Payment UI
+                participant L as Logs (stdout JSON)
+                participant T as Tracing (OTLP)
+                participant M as Métricas (OTLP)
+                participant O as OTel Collector
+                participant HC as Health Check
+
+                par Logs
+                    C->>L: slog.Info/Warn/Error
+                    Note over L: campos: payment_id, trace_id, level, error
+                and Tracing
+                    C->>T: startSpan("process_message")
+                    activate T
+                    T->>T: childSpan("validator.validate")
+                    T->>T: childSpan("idempotency.check")
+                    T->>T: childSpan("retry.do")
+                    Note over T: AlwaysSample (desenvolvimento)
+                    T->>O: OTLP gRPC :4317
+                and Métricas
+                    C->>M: counter(messages_received)
+                    C->>M: counter(messages_processed)
+                    C->>M: histogram(processing_duration)
+                    Note over M: buckets: 1,5,10,25,50, 100,250,500,1000ms
+                    M->>O: OTLP gRPC :4317
+                end
+
+                O->>O: batch processor timeout 1s / 1024 items
+                O->>O: debug exporter verbosity: detailed
+
+                par Health Check Consumer
+                    HC->>C: GET /healthz
+                    C-->>HC: 200 {"status":"ok"}
+                    HC->>C: GET /readyz
+                    Note over C: testa Redis + DynamoDB
+                    C-->>HC: 200 ou 503
+                and Health Check UI
+                    HC->>U: GET /healthz
+                    Note over U: testa Redis Ping
+                    U-->>HC: 200 {"redis":"connected"}
+                end
+        </div>
+        <p class="mermaid-caption">Diagrama de sequência UML — Fluxo de observabilidade: logs, tracing e métricas exportados via OTLP, health checks sendo consultados.</p>
+        </div>
+
+        <h2 id="opentelemetry-setup">OpenTelemetry Setup</h2>
+
+        <h3 id="inicializacao">Inicialização</h3>
+        <p>A configuração do OpenTelemetry é feita no pacote <code>pkg/telemetry/telemetry.go</code>:</p>
+        <pre><code>// Inicializa TracerProvider com exportador OTLP gRPC
+tp, err := telemetry.InitTracerProvider(ctx, cfg)
+
+// Inicializa MeterProvider com exportador OTLP gRPC
+mp, err := telemetry.InitMeterProvider(ctx, cfg)</code></pre>
+
+        <p><strong>Configuração:</strong></p>
+        <ul>
+            <li>Exportador OTLP gRPC para o endpoint configurado (default: <code>localhost:4317</code>)</li>
+            <li>TracerProvider com <code>AlwaysSample</code> (desenvolvimento) e batcher com timeout de 5s</li>
+            <li>MeterProvider com leitor periódico a cada 10s</li>
+            <li>Resource com <code>service.name</code> configurável</li>
+        </ul>
+
+        <h3 id="otel-collector">OTel Collector</h3>
+        <p>O <code>otel-collector-config.yaml</code> configura o OpenTelemetry Collector para receber e processar telemetria:</p>
+        <pre><code>receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]</code></pre>
+        <p>Para visualização em produção, configure exporters adicionais (Jaeger, Prometheus, etc.).</p>
+
+        <h2 id="logs-estruturados">Logs Estruturados</h2>
+
+        <h3 id="formato">Formato</h3>
+        <p>Todos os logs são em <strong>JSON</strong> via <code>log/slog</code>:</p>
+        <pre>{
+  "time": "2026-05-24T10:30:00.123Z",
+  "level": "WARN",
+  "msg": "retry attempt failed",
+  "service": "payment-consumer",
+  "payment_id": "a1b2c3d4-...",
+  "attempt": 2,
+  "max_attempts": 3,
+  "error": "dynamodb put error: operation timeout",
+  "trace_id": "0af7651916cd43dd8448eb211c80319c"
+}</pre>
+
+        <h3 id="eventos-consumer">Eventos do Consumer</h3>
+        <table>
+            <thead>
+                <tr><th>Evento</th><th>Level</th><th>Campos Adicionais</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Mensagem recebida</td><td>DEBUG</td><td><code>payment_id</code>, <code>offset</code>, <code>partition</code>, <code>trace_id</code></td></tr>
+                <tr><td>Payload validado</td><td>DEBUG</td><td><code>payment_id</code></td></tr>
+                <tr><td>Payload inválido</td><td>WARN</td><td><code>payment_id</code>, <code>error</code></td></tr>
+                <tr><td>Idempotency hit (já processado)</td><td>INFO</td><td><code>payment_id</code></td></tr>
+                <tr><td>Idempotency check falhou</td><td>WARN</td><td><code>payment_id</code>, <code>error</code> (fallback otimista)</td></tr>
+                <tr><td>Status atualizado no Redis</td><td>DEBUG</td><td><code>payment_id</code>, <code>status</code></td></tr>
+                <tr><td>Histórico registrado no DynamoDB</td><td>DEBUG</td><td><code>payment_id</code></td></tr>
+                <tr><td>Retry tentativa</td><td>WARN</td><td><code>payment_id</code>, <code>attempt</code>, <code>max_attempts</code>, <code>error</code></td></tr>
+                <tr><td>Retry exaurido</td><td>ERROR</td><td><code>payment_id</code>, <code>attempts</code>, <code>last_error</code></td></tr>
+                <tr><td>DLG publicado</td><td>ERROR</td><td><code>payment_id</code>, <code>original_offset</code>, <code>last_error</code></td></tr>
+                <tr><td>DLQ falhou</td><td>CRIT</td><td><code>payment_id</code>, <code>error</code></td></tr>
+                <tr><td>Graceful shutdown</td><td>INFO</td><td><code>timeout</code></td></tr>
+                <tr><td>Consumer group rebalance</td><td>INFO</td><td><code>group_id</code>, <code>partition</code></td></tr>
+            </tbody>
+        </table>
+
+        <h3 id="eventos-ui">Eventos da UI</h3>
+        <table>
+            <thead>
+                <tr><th>Evento</th><th>Level</th><th>Campos Adicionais</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Servidor iniciado</td><td>INFO</td><td><code>port</code></td></tr>
+                <tr><td>Request HTTP</td><td>INFO</td><td><code>method</code>, <code>path</code>, <code>status</code>, <code>duration</code></td></tr>
+                <tr><td>SSE cliente conectado</td><td>DEBUG</td><td><code>remote_addr</code></td></tr>
+                <tr><td>Evento descartado (buffer)</td><td>WARN</td><td><code>subscriber_id</code></td></tr>
+                <tr><td>Redis scan error</td><td>ERROR</td><td><code>error</code></td></tr>
+                <tr><td>DynamoDB query error</td><td>ERROR</td><td><code>payment_id</code>, <code>error</code></td></tr>
+                <tr><td>Health check falhou</td><td>WARN</td><td><code>component</code> (redis)</td></tr>
+            </tbody>
+        </table>
+
+        <h3 id="o-que-nao-logar">O que NÃO deve ser logado</h3>
+        <ul>
+            <li>Valor completo de <code>amount</code> (pode ser mascarado)</li>
+            <li>Números de cartão de crédito (não fazem parte do schema, mas por segurança)</li>
+            <li>Senhas, tokens, secrets</li>
+            <li>Stack traces completos (apenas mensagem de erro)</li>
+        </ul>
+
+        <h2 id="tracing-distribuido">Tracing Distribuído</h2>
+
+        <h3 id="hierarquia-spans">Hierarquia de Spans (Consumer)</h3>
+        <p>Para cada mensagem processada, a seguinte hierarquia de spans é criada:</p>
+        <pre>process_message (span raiz)
+├── [atributos: payment_id, partition, offset, messaging.system]
+│
+├── validator.validate
+├── idempotency.is_processed
+├── idempotency.mark_processed
+│
+└── retry.do
+    ├── [tentativa 1]
+    │   ├── status.update
+    │   └── history.record
+    ├── [tentativa 2]
+    │   ├── status.update
+    │   └── history.record
+    └── [tentativa 3]
+        ├── status.update
+        └── history.record
+
+└── dlq.publish (apenas se falhar)</pre>
+
+        <h3 id="atributos-obrigatorios">Atributos Obrigatórios</h3>
+        <table>
+            <thead>
+                <tr><th>Atributo</th><th>Descrição</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>payment_id</code></td><td>ID do pagamento</td></tr>
+                <tr><td><code>messaging.system</code></td><td><code>kafka</code></td></tr>
+                <tr><td><code>messaging.destination</code></td><td><code>payment.events</code></td></tr>
+                <tr><td><code>messaging.kafka.partition</code></td><td>Partição</td></tr>
+                <tr><td><code>messaging.kafka.offset</code></td><td>Offset</td></tr>
+                <tr><td><code>messaging.consumer_group</code></td><td><code>payment-consumer-group</code></td></tr>
+            </tbody>
+        </table>
+
+        <h3 id="sampling">Sampling</h3>
+        <table>
+            <thead>
+                <tr><th>Ambiente</th><th>Estratégia</th><th>Taxa</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Desenvolvimento</td><td><code>AlwaysSample</code></td><td>100%</td></tr>
+                <tr><td>Produção</td><td><code>ParentBased</code></td><td>10% (configurável)</td></tr>
+            </tbody>
+        </table>
+
+        <h2 id="metricas">Métricas</h2>
+
+        <h3 id="metricas-consumer">Métricas do Consumer</h3>
+        <table>
+            <thead>
+                <tr><th>Nome</th><th>Tipo</th><th>Atributos</th><th>Descrição</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>payment.consumer.messages_received</code></td><td>Counter</td><td><code>partition</code></td><td>Total de mensagens recebidas</td></tr>
+                <tr><td><code>payment.consumer.messages_processed</code></td><td>Counter</td><td><code>status</code> (success/error)</td><td>Total de mensagens processadas</td></tr>
+                <tr><td><code>payment.consumer.processing_duration</code></td><td>Histogram</td><td><code>status</code>, <code>has_retry</code></td><td>Duração do processamento (ms)</td></tr>
+                <tr><td><code>payment.consumer.retry_attempts</code></td><td>Counter</td><td><code>attempt</code></td><td>Total de tentativas de retry</td></tr>
+                <tr><td><code>payment.consumer.dlq_published</code></td><td>Counter</td><td><code>reason</code> (validation/retry)</td><td>Total de mensagens na DLQ</td></tr>
+                <tr><td><code>payment.consumer.idempotency_hits</code></td><td>Counter</td><td>—</td><td>Total de mensagens duplicadas ignoradas</td></tr>
+            </tbody>
+        </table>
+
+        <p><strong>Buckets do histograma <code>processing_duration</code></strong>: <code>[1, 5, 10, 25, 50, 100, 250, 500, 1000]</code> ms.</p>
+
+        <h3 id="metricas-ui">Métricas da UI</h3>
+        <p>A UI expõe métricas via endpoint <code>/api/metrics</code> (não via OTel):</p>
+        <table>
+            <thead>
+                <tr><th>Métrica</th><th>Cálculo</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>total_processed</code></td><td>Total de chaves <code>payment:*</code> no Redis</td></tr>
+                <tr><td><code>by_status</code></td><td>Contagem de pagamentos por status</td></tr>
+                <tr><td><code>success_rate</code></td><td><code>confirmed / (confirmed + failed + refunded)</code></td></tr>
+                <tr><td><code>dlq_count</code></td><td>Disponível via Kafka admin client (retorna 0 se indisponível)</td></tr>
+            </tbody>
+        </table>
+
+        <h2 id="health-checks">Health Checks</h2>
+
+        <h3 id="health-consumer">Consumer (porta 8080)</h3>
+        <table>
+            <thead>
+                <tr><th>Endpoint</th><th>Comportamento</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>/healthz</code></td><td>Retorna 200 se o servidor está rodando (always ok)</td></tr>
+                <tr><td><code>/readyz</code></td><td>Retorna 200 se Redis e DynamoDB estão acessíveis</td></tr>
+            </tbody>
+        </table>
+        <pre><code>curl http://localhost:8080/healthz
+# {"status":"ok"}
+
+curl http://localhost:8080/readyz
+# {"status":"ok"}
+# ou {"status":"redis_down"} / {"status":"dynamodb_down"}</code></pre>
+
+        <h3 id="health-ui">UI (porta 8081)</h3>
+        <table>
+            <thead>
+                <tr><th>Endpoint</th><th>Comportamento</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>/healthz</code></td><td>Retorna 200 se Redis responde ping</td></tr>
+            </tbody>
+        </table>
+        <pre><code>curl http://localhost:8081/healthz
+# {"status":"ok","redis":"connected"}
+# ou {"status":"unhealthy","redis":"down"}</code></pre>
+
+        <h2 id="configuracao-otel">Configuração OTel</h2>
+        <table>
+            <thead>
+                <tr><th>Variável</th><th>Default</th><th>Descrição</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>OTEL_EXPORTER_OTLP_ENDPOINT</code></td><td><code>localhost:4317</code></td><td>Endpoint do OTel Collector</td></tr>
+                <tr><td><code>OTEL_SERVICE_NAME</code></td><td><code>payment-consumer</code></td><td>Nome do serviço (tracing + métricas)</td></tr>
+            </tbody>
+        </table>
+
+        <h2 id="comportamento-falha">Comportamento sob Falha</h2>
+        <table>
+            <thead>
+                <tr><th>Cenário</th><th>Impacto na Observabilidade</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>OTel Collector down</td><td>Logs continuam (stdout). Tracing/métricas são perdidos (buffer interno limitado)</td></tr>
+                <tr><td>Redis down</td><td>Métricas de idempotência e status não são registradas. Health check detecta.</td></tr>
+                <tr><td>DynamoDB down</td><td>Histórico não é registrado. Retry é acionado. Eventos vão para DLQ.</td></tr>
+                <tr><td>Kafka down</td><td>Consumer não recebe mensagens. Logs de erro de conexão.</td></tr>
+            </tbody>
+        </table>
+
+        <div class="footer">
+            <p>Payment Processor - Documentação Técnica</p>
+            <div class="footer-links">
+                <a href="index.html">Início</a>
+                <a href="architecture.html">Arquitetura</a>
+                <a href="setup.html">Setup</a>
+                <a href="observability.html">Observabilidade</a>
+                <a href="features/payment-consumer.html">Consumer</a>
+                <a href="features/payment-ui.html">UI</a>
+                <a href="features/cli-producer.html">CLI</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+        <button class="close-btn" onclick="closeLightboxDirect()">&times;</button>
+        <img id="lightboxImg" src="" alt="">
+        <div class="caption" id="lightboxCaption"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({startOnLoad:true,securityLevel:'loose',theme:'dark',themeVariables:{primaryColor:'#1a2e20',primaryTextColor:'#e0e0e0',primaryBorderColor:'#4a5a4a',lineColor:'#6a7a6a',secondaryColor:'#1a3620',tertiaryColor:'#33691e',fontSize:'14px'},flowchart:{useMaxWidth:true,htmlLabels:true,curve:'basis'}});
+        function openLightbox(img){var lb=document.getElementById('lightbox'),lbImg=document.getElementById('lightboxImg'),lbCap=document.getElementById('lightboxCaption');lbImg.src=img.src;var cap=img.nextElementSibling;if(cap&&cap.classList.contains('diagram-caption'))lbCap.textContent=cap.textContent;else lbCap.textContent='';lb.classList.add('open');document.body.style.overflow='hidden';}
+        function closeLightbox(e){if(e.target===e.currentTarget)closeLightboxDirect();}
+        function closeLightboxDirect(){document.getElementById('lightbox').classList.remove('open');document.body.style.overflow='';}
+        document.addEventListener('keydown',function(e){if(e.key==='Escape')closeLightboxDirect();});
+        function addCopyButtons(){document.querySelectorAll('pre').forEach(function(pre){if(pre.querySelector('.copy-btn'))return;var btn=document.createElement('button');btn.className='copy-btn';btn.textContent='Copy';btn.onclick=function(){var code=pre.querySelector('code'),text=code?code.textContent:pre.textContent;navigator.clipboard.writeText(text).then(function(){btn.textContent='Copied!';btn.classList.add('copied');setTimeout(function(){btn.textContent='Copy';btn.classList.remove('copied')},2000)}).catch(function(){btn.textContent='Failed';setTimeout(function(){btn.textContent='Copy'},2000)})};pre.appendChild(btn)})}
+        function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebarOverlay').classList.toggle('open')}
+        function initZoom(){var wrappers=document.querySelectorAll('.mermaid-wrapper');if(wrappers.length===0){setTimeout(initZoom,300);return}wrappers.forEach(function(wrapper){var svg=wrapper.querySelector('svg');if(!svg)return;svg.style.transformOrigin='0 0';var scale=1,tx=0,ty=0,panning=false,sx=0,sy=0;function update(){svg.style.transform='translate('+tx+'px,'+ty+'px) scale('+scale+')'};var tb=document.createElement('div');tb.className='zoom-toolbar';var bi=document.createElement('button');bi.textContent='+';bi.onclick=function(){scale=Math.min(scale*1.4,10);update()};var bo=document.createElement('button');bo.textContent='−';bo.onclick=function(){scale=Math.max(scale/1.4,0.3);update()};var br=document.createElement('button');br.textContent='↺';br.onclick=function(){scale=1;tx=0;ty=0;update()};tb.appendChild(bi);tb.appendChild(bo);tb.appendChild(br);wrapper.appendChild(tb);svg.addEventListener('mousedown',function(e){panning=true;sx=e.clientX-tx;sy=e.clientY-ty;svg.style.cursor='grabbing'});document.addEventListener('mousemove',function(e){if(!panning)return;tx=e.clientX-sx;ty=e.clientY-sy;update()});document.addEventListener('mouseup',function(){panning=false;svg.style.cursor='grab'});wrapper.addEventListener('wheel',function(e){e.preventDefault();var d=e.deltaY>0?1/1.1:1.1;scale=Math.max(0.3,Math.min(10,scale*d));update()},{passive:false})})}
+        if(document.readyState==='complete'){setTimeout(function(){initZoom();addCopyButtons()},500)}else{window.addEventListener('load',function(){setTimeout(function(){initZoom();addCopyButtons()},500)})}
+    </script>
+</body>
+</html>

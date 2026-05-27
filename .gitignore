@@ -1,0 +1,30 @@
+# --- Go build artifacts ---
+bin/
+*.exe
+*.test
+*.out
+
+# --- Compiled binaries that match cmd/ names (manual builds) ---
+consumer
+producer
+ui
+
+# --- Runtime data (mounted by docker-compose for Floci) ---
+data/*
+!data/.gitkeep
+
+# --- IDE ---
+.idea/
+*.swp
+*.swo
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Node ---
+node_modules/
+
+# --- Copied docs for UI embed (build artifact) ---
+internal/ui/static/docs/
