@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Métricas — Payment Monitor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>⬡</text></svg>">
+
+    <style>
+        /* ============================================================
+           DASHBOARD GRAPHICS — Chart-specific styles
+           Reuses CSS custom properties from style.css
+           ============================================================ */
+
+        /* ---- Charts Grid ---- */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-card {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            transition: border-color 0.2s var(--ease-out);
+            position: relative;
+        }
+
+        .chart-card:hover {
+            border-color: rgba(45, 49, 64, 1);
+        }
+
+        .chart-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 16px 20px 0;
+            margin-bottom: 12px;
+        }
+
+        .chart-header h2 {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--color-text);
+            letter-spacing: -0.01em;
+        }
+
+        .chart-body {
+            padding: 0 16px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .chart-full-width {
+            grid-column: 1 / -1;
+        }
+
+        /* ---- Donut Legend ---- */
+        .chart-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 8px;
+            padding: 0 4px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.78rem;
+            color: var(--color-text-secondary);
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .legend-value {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-weight: 700;
+            color: var(--color-text);
+            margin-left: 2px;
+        }
+
+        /* ---- Session Counter ---- */
+        .counter-body {
+            justify-content: center;
+            min-height: 200px;
+        }
+
+        .session-counter {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 3.5rem;
+            font-weight: 800;
+            color: var(--color-accent-light);
+            line-height: 1;
+            transition: transform 0.15s var(--ease-spring);
+            will-change: transform;
+        }
+
+        .session-counter.bounce {
+            animation: counter-bounce 0.3s var(--ease-spring);
+        }
+
+        @keyframes counter-bounce {
+            0%   { transform: scale(1); }
+            40%  { transform: scale(1.18); }
+            100% { transform: scale(1); }
+        }
+
+        .counter-label {
+            font-size: 0.82rem;
+            color: var(--color-text-muted);
+            margin-top: 6px;
+            text-align: center;
+        }
+
+        /* Counter card accent gradient */
+        #chart-counter .chart-body {
+            background: linear-gradient(135deg, rgba(124,92,252,0.06), rgba(167,139,250,0.03));
+            border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+        }
+
+        /* ---- DLQ Section ---- */
+        .dlq-body {
+            padding: 20px;
+        }
+
+        .dlq-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            font-size: 1.1rem;
+            flex-wrap: wrap;
+        }
+
+        .dlq-icon {
+            font-size: 1.4rem;
+            line-height: 1;
+        }
+
+        .dlq-count {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--color-warning);
+            line-height: 1;
+        }
+
+        .dlq-count.zero {
+            color: var(--color-text-muted);
+        }
+
+        .dlq-label {
+            color: var(--color-text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .dlq-warning {
+            color: var(--color-warning);
+            font-size: 0.78rem;
+            font-weight: 600;
+            margin-left: 4px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        /* ---- Error Banner ---- */
+        .error-banner {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            background: var(--color-error-subtle);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            border-radius: var(--radius);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.85rem;
+            color: var(--color-error);
+            font-weight: 500;
+        }
+
+        .error-banner.visible {
+            display: flex;
+        }
+
+        .error-icon {
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        .error-retry {
+            margin-left: auto;
+            font-size: 0.75rem;
+            color: var(--color-text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* ---- Charts Area (relative wrapper for overlay) ---- */
+        .charts-area {
+            position: relative;
+        }
+
+        /* ---- Loading Overlay ---- */
+        .loading-overlay {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            padding: 80px 20px;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            transition: opacity 0.4s var(--ease-out);
+            position: absolute;
+            inset: 0;
+            z-index: 5;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--color-border);
+            border-top-color: var(--color-accent);
+            border-radius: 50%;
+            animation: load-spin 0.8s linear infinite;
+        }
+
+        @keyframes load-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.9rem;
+            color: var(--color-text-muted);
+        }
+
+        /* ---- Bar Chart Tooltip ---- */
+        .chart-tooltip {
+            position: fixed;
+            display: none;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius);
+            padding: 8px 14px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--color-text);
+            pointer-events: none;
+            z-index: 100;
+            box-shadow: var(--shadow-md);
+            white-space: nowrap;
+        }
+
+        .chart-tooltip.visible {
+            display: block;
+        }
+
+        .chart-tooltip .tt-label {
+            font-size: 0.68rem;
+            color: var(--color-text-muted);
+            font-weight: 500;
+        }
+
+        /* ---- Empty state for bar chart ---- */
+        .chart-empty-msg {
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.85rem;
+            color: var(--color-text-muted);
+            text-align: center;
+            padding: 40px 20px;
+            font-style: italic;
+        }
+
+        /* ---- Bar note ---- */
+        .chart-note {
+            font-size: 0.7rem;
+            color: var(--color-text-muted);
+            text-align: center;
+            margin-top: 6px;
+            font-style: italic;
+        }
+
+        /* ---- Responsive ---- */
+        @media (max-width: 768px) {
+            .charts-grid {
+                gap: 12px;
+            }
+
+            .chart-header {
+                padding: 14px 16px 0;
+            }
+
+            .chart-header h2 {
+                font-size: 0.82rem;
+            }
+
+            .chart-body {
+                padding: 0 12px 14px;
+            }
+
+            .session-counter {
+                font-size: 2.8rem;
+            }
+
+            .legend-item {
+                font-size: 0.72rem;
+            }
+
+            .dlq-count {
+                font-size: 1.6rem;
+            }
+
+            .dlq-body {
+                padding: 16px;
+            }
+
+            .counter-body {
+                min-height: 160px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .chart-header {
+                padding: 12px 12px 0;
+            }
+
+            .chart-body {
+                padding: 0 8px 12px;
+            }
+
+            .session-counter {
+                font-size: 2.2rem;
+            }
+        }
+
+        /* ---- Noscript ---- */
+        .noscript-msg {
+            padding: 40px 20px;
+            text-align: center;
+            color: var(--color-text-muted);
+            font-family: 'DM Sans', sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+
+        <!-- ============ HEADER ============ -->
+        <header>
+            <div class="header-brand">
+                <span class="brand-icon">⬡</span>
+                <div class="brand-text">
+                    <h1>Dashboard de Métricas</h1>
+                    <span class="brand-subtitle">Processamento de Pagamentos em Tempo Real</span>
+                </div>
+            </div>
+            <nav class="header-nav">
+                <a href="/" class="nav-link">📋 Dashboard</a>
+                <a href="/producer" class="nav-link">📝 Producer</a>
+                <a href="/dashboard" class="nav-link active">📊 Gráficos</a>
+            </nav>
+            <div id="connection-status" aria-live="polite">🔴 Desconectado</div>
+        </header>
+
+        <!-- ============ ERROR BANNER ============ -->
+        <div id="error-banner" class="error-banner" role="alert">
+            <span class="error-icon">⚠️</span>
+            <span id="error-message">API de métricas indisponível</span>
+            <span class="error-retry" id="error-retry"></span>
+        </div>
+
+        <!-- ============ CHARTS AREA (relative wrapper for loading overlay) ============ -->
+        <div class="charts-area" id="charts-area">
+
+        <!-- ============ CHARTS GRID ============ -->
+        <div class="charts-grid" id="charts-grid">
+
+            <!-- Donut Chart -->
+            <div class="chart-card" id="chart-donut">
+                <div class="chart-header">
+                    <span class="section-head-accent"></span>
+                    <h2>Distribuição por Status</h2>
+                    <span class="section-head-badge">Tempo Real</span>
+                </div>
+                <div class="chart-body">
+                    <canvas id="donut-canvas"
+                            role="img"
+                            aria-label="Gráfico de distribuição de pagamentos por status"></canvas>
+                    <div id="donut-legend" class="chart-legend"></div>
+                </div>
+            </div>
+
+            <!-- Gauge Chart -->
+            <div class="chart-card" id="chart-gauge">
+                <div class="chart-header">
+                    <span class="section-head-accent"></span>
+                    <h2>Taxa de Sucesso</h2>
+                </div>
+                <div class="chart-body">
+                    <canvas id="gauge-canvas"
+                            role="img"
+                            aria-label="Medidor de taxa de sucesso"></canvas>
+                </div>
+            </div>
+
+            <!-- Session Counter -->
+            <div class="chart-card" id="chart-counter">
+                <div class="chart-header">
+                    <span class="section-head-accent"></span>
+                    <h2>Eventos na Sessão</h2>
+                </div>
+                <div class="chart-body counter-body">
+                    <div class="session-counter" id="session-counter">0</div>
+                    <div class="counter-label">eventos desde que abriu</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ BAR CHART ============ -->
+        <div class="chart-card chart-full-width" id="chart-bar" style="margin-bottom: 24px;">
+            <div class="chart-header">
+                <span class="section-head-accent"></span>
+                <h2>Pagamentos por Hora (24h)</h2>
+                <span class="section-head-badge">Estimado</span>
+            </div>
+            <div class="chart-body">
+                <canvas id="bar-canvas"
+                        role="img"
+                        aria-label="Gráfico de barras de pagamentos por hora nas últimas 24 horas"></canvas>
+                <div class="chart-note">Distribuição estimada baseada nos dados atuais</div>
+            </div>
+        </div>
+
+        <!-- ============ DLQ SECTION ============ -->
+        <div class="chart-card chart-full-width" id="chart-dlq" style="margin-bottom: 24px;">
+            <div class="chart-header">
+                <span class="section-head-accent"></span>
+                <h2>Dead Letter Queue</h2>
+            </div>
+            <div class="chart-body dlq-body">
+                <div class="dlq-content">
+                    <span class="dlq-icon">⚠️</span>
+                    <span class="dlq-count zero" id="dlq-count">0</span>
+                    <span class="dlq-label">mensagens não processadas</span>
+                </div>
+            </div>
+        </div>
+
+            <!-- ============ LOADING OVERLAY ============ -->
+            <div id="loading-overlay" class="loading-overlay">
+                <div class="loading-spinner"></div>
+                <span class="loading-text">Carregando métricas...</span>
+            </div>
+
+        </div> <!-- /charts-area -->
+
+    </div>
+
+    <!-- ============ BAR TOOLTIP ============ -->
+    <div id="bar-tooltip" class="chart-tooltip">
+        <div class="tt-label" id="tt-label">00:00</div>
+        <div class="tt-value" id="tt-value">0</div>
+    </div>
+
+    <noscript>
+        <div class="noscript-msg">
+            JavaScript é necessário para exibir os gráficos. Ative o JavaScript no seu navegador.
+        </div>
+    </noscript>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>

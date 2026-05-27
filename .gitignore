@@ -5,9 +5,9 @@ bin/
 *.out
 
 # --- Compiled binaries that match cmd/ names (manual builds) ---
-consumer
-producer
-ui
+/consumer
+/producer
+/ui
 
 # --- Runtime data (mounted by docker-compose for Floci) ---
 data/*
