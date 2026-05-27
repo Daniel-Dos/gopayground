@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guia de Setup - Payment Processor</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --color-primary: #1a3620;
+            --color-primary-dark: #0f2414;
+            --color-primary-light: #2a5a32;
+            --color-accent: #7cb342;
+            --color-accent-light: #aed581;
+            --color-accent-dark: #558b2f;
+            --color-bg: #f5f7f0;
+            --color-card: #ffffff;
+            --color-text: #2d3a2d;
+            --color-text-light: #5a6a5a;
+            --color-text-muted: #8a9a8a;
+            --color-sidebar-bg: #1a3620;
+            --color-sidebar-hover: #0f2414;
+            --color-sidebar-text: #c8dcc8;
+            --color-sidebar-active: #7cb342;
+            --color-code-bg: #1e2a1e;
+            --color-border: #dce4d4;
+            --color-info-bg: #f1f8e9;
+            --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            --font-code: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+            --sidebar-width: 260px;
+            --topbar-height: 48px;
+        }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: var(--font-body);
+            background: var(--color-bg);
+            color: var(--color-text);
+            line-height: 1.7;
+            display: flex;
+            min-height: 100vh;
+            padding-top: var(--topbar-height);
+        }
+        .topbar { position:fixed; top:0; left:0; right:0; height:var(--topbar-height); background:var(--color-primary-dark); color:#e8f0e8; display:flex; align-items:center; padding:0 1rem; z-index:200; border-bottom:1px solid rgba(255,255,255,0.06); gap:0.75rem; }
+        .topbar .hamburger { display:none; background:none; border:none; color:#e8f0e8; font-size:1.4rem; cursor:pointer; padding:0.25rem 0.5rem; border-radius:4px; }
+        .topbar .hamburger:hover { background:rgba(255,255,255,0.1); }
+        .topbar .project-title { font-weight:700; font-size:0.95rem; letter-spacing:0.5px; }
+        .topbar .project-tagline { font-size:0.78rem; color:#9ab89a; margin-left:0.5rem; }
+        .topbar .project-tagline::before { content:"— "; }
+        .topbar .topbar-right { margin-left:auto; font-size:0.78rem; color:#9ab89a; }
+        .sidebar-overlay { display:none; position:fixed; top:0;left:0;right:0;bottom:0; background:rgba(0,0,0,0.4); z-index:98; }
+        .sidebar-overlay.open { display:block; }
+        .sidebar { width:var(--sidebar-width); background:var(--color-sidebar-bg); color:var(--color-sidebar-text); padding:1.2rem 0.75rem; position:fixed; top:var(--topbar-height); left:0; bottom:0; overflow-y:auto; z-index:99; border-right:1px solid rgba(255,255,255,0.04); transition:transform .3s ease; }
+        .sidebar h2 { font-size:0.7rem; color:var(--color-accent-light); margin-bottom:0.6rem; text-transform:uppercase; letter-spacing:1.5px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:0.5rem; font-weight:600; }
+        .sidebar ul { list-style:none; padding:0; }
+        .sidebar ul li { margin-bottom:0.15rem; }
+        .sidebar ul li a { color:var(--color-sidebar-text); text-decoration:none; font-size:0.88rem; display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0.6rem; border-radius:6px; transition:background .2s,color .2s,padding-left .2s; border-left:3px solid transparent; }
+        .sidebar ul li a:hover { background:var(--color-sidebar-hover); color:#fff; padding-left:0.8rem; }
+        .sidebar ul li a.active { background:var(--color-sidebar-hover); color:var(--color-sidebar-active); border-left-color:var(--color-sidebar-active); font-weight:600; }
+        .sidebar ul li a .nav-icon { font-size:1rem; width:1.4rem; text-align:center; opacity:0.7; }
+        .sidebar ul li a.active .nav-icon { opacity:1; }
+        .sidebar .nav-section { margin-bottom:1.5rem; }
+        .breadcrumb { display:flex; align-items:center; gap:0.4rem; font-size:0.8rem; color:var(--color-text-muted); margin-bottom:0.5rem; padding:0.4rem 0; flex-wrap:wrap; }
+        .breadcrumb a { color:var(--color-accent); text-decoration:none; }
+        .breadcrumb a:hover { text-decoration:underline; }
+        .breadcrumb .sep { color:var(--color-text-muted); font-size:0.7rem; }
+        .breadcrumb .current { color:var(--color-text-light); font-weight:500; }
+        .main-content { margin-left:var(--sidebar-width); flex:1; padding:1.5rem 2.5rem 3rem; max-width:960px; }
+        header { background:linear-gradient(135deg,var(--color-primary-dark) 0%,var(--color-primary) 40%,#2a5a32 100%); color:#fff; padding:2rem 2.5rem; border-radius:10px; margin-bottom:2rem; position:relative; overflow:hidden; }
+        header::before { content:''; position:absolute; top:0;left:0;right:0;bottom:0; background:repeating-linear-gradient(45deg,transparent,transparent 20px,rgba(255,255,255,0.015) 20px,rgba(255,255,255,0.015) 21px); pointer-events:none; }
+        header h1 { font-size:2rem; margin-bottom:0.3rem; color:#ffffff; position:relative; z-index:1; }
+        header p { color:#c8dcc8; font-size:0.95rem; position:relative; z-index:1; max-width:80%; }
+        h1, h2, h3, h4, h5, h6 { color:var(--color-primary); margin-top:1.8rem; margin-bottom:0.8rem; font-weight:700; line-height:1.3; }
+        h1 { font-size:2rem; border-bottom:2px solid var(--color-accent); padding-bottom:0.5rem; }
+        h2 { font-size:1.6rem; border-bottom:2px solid var(--color-accent-light); padding-bottom:0.3rem; }
+        h3 { font-size:1.25rem; }
+        h4 { font-size:1.05rem; }
+        h2, h3 { scroll-margin-top:calc(var(--topbar-height) + 1rem); }
+        p { margin-bottom:1rem; }
+        a { color:var(--color-accent); text-decoration:none; }
+        a:hover { text-decoration:underline; }
+        ul, ol { margin-bottom:1rem; padding-left:2rem; }
+        li { margin-bottom:0.3rem; }
+        table { width:100%; border-collapse:collapse; margin-bottom:1.5rem; font-size:0.88rem; border-radius:8px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.04); }
+        table th, table td { border:1px solid var(--color-border); padding:0.65rem 0.9rem; text-align:left; }
+        table th { background:var(--color-primary); color:#fff; font-weight:600; font-size:0.82rem; letter-spacing:0.3px; text-transform:uppercase; }
+        table tr:nth-child(even) { background:#fafcfa; }
+        table tr:hover { background:#f0f5ec; transition:background .15s; }
+        pre { background:var(--color-code-bg); color:#e8e8e8; padding:1rem 1rem 1rem 1.2rem; border-radius:8px; overflow-x:auto; font-family:var(--font-code); font-size:0.82rem; line-height:1.55; margin-bottom:1.5rem; position:relative; border-left:3px solid var(--color-accent); }
+        code { font-family:var(--font-code); font-size:0.85rem; background:#e8f0e4; padding:0.15rem 0.4rem; border-radius:3px; color:var(--color-primary); }
+        pre code { background:transparent; padding:0; font-size:inherit; color:inherit; }
+        .copy-btn { position:absolute; top:0.5rem; right:0.5rem; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:#b0c0b0; cursor:pointer; font-size:0.72rem; padding:0.25rem 0.6rem; border-radius:4px; opacity:0; transition:opacity .2s,background .2s; font-family:var(--font-body); }
+        pre:hover .copy-btn { opacity:1; }
+        .copy-btn:hover { background:rgba(255,255,255,0.15); color:#fff; }
+        .copy-btn.copied { background:var(--color-accent); color:#fff; border-color:var(--color-accent); }
+        blockquote { border-left:4px solid var(--color-accent); padding:0.75rem 1.2rem; margin-bottom:1rem; background:var(--color-info-bg); border-radius:0 6px 6px 0; }
+        blockquote p { margin-bottom:0; }
+        hr { border:none; border-top:1px solid var(--color-border); margin:2rem 0; }
+        .footer { margin-top:3rem; padding-top:1.5rem; border-top:1px solid var(--color-border); text-align:center; color:var(--color-text-muted); font-size:0.82rem; }
+        .footer a { color:var(--color-accent); }
+        .footer-links { display:flex; justify-content:center; gap:0.4rem; flex-wrap:wrap; margin-top:0.5rem; }
+        .footer-links a { padding:0.2rem 0.5rem; }
+        .mermaid-wrapper { position:relative; background:var(--color-sidebar-bg); border-radius:10px; margin-bottom:1.5rem; overflow:hidden; min-height:300px; box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+        .mermaid-wrapper .mermaid { padding:1.5rem; text-align:center; margin:0; border-radius:0; background:none; }
+        .mermaid-wrapper .mermaid svg { max-width:none; width:100%; height:auto; cursor:grab; transform-origin:0 0; }
+        .mermaid-wrapper .mermaid svg:active { cursor:grabbing; }
+        .zoom-toolbar { position:absolute; bottom:10px; right:10px; display:flex; gap:4px; z-index:10; opacity:0.4; transition:opacity .2s; }
+        .mermaid-wrapper:hover .zoom-toolbar { opacity:1; }
+        .zoom-toolbar button { width:32px; height:32px; border:1px solid rgba(255,255,255,0.15); background:rgba(0,0,0,0.4); color:#e0e0e0; border-radius:4px; cursor:pointer; font-size:18px; line-height:1; display:flex; align-items:center; justify-content:center; transition:background .2s; user-select:none; backdrop-filter:blur(4px); }
+        .zoom-toolbar button:hover { background:rgba(0,0,0,0.6); border-color:var(--color-accent-light); }
+        .mermaid-caption { font-size:0.85rem; color:var(--color-text-muted); text-align:center; margin-top:-1rem; margin-bottom:1.5rem; font-style:italic; }
+        .diagram-img { max-width:100%; height:auto; border:1px solid var(--color-border); border-radius:10px; margin:1.5rem 0; box-shadow:0 3px 12px rgba(0,0,0,0.06); transition:transform .3s ease,box-shadow .3s ease; cursor:pointer; display:block; }
+        .diagram-img:hover { transform:scale(1.01); box-shadow:0 6px 24px rgba(0,0,0,0.1); }
+        .diagram-caption { text-align:center; font-style:italic; color:var(--color-text-muted); margin-top:-0.8rem; margin-bottom:1.5rem; font-size:0.85rem; }
+        .lightbox { display:none; position:fixed; z-index:9999; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); align-items:center; justify-content:center; padding:2rem; }
+        .lightbox.open { display:flex; }
+        .lightbox img { max-width:95vw; max-height:90vh; border-radius:8px; box-shadow:0 8px 40px rgba(0,0,0,0.5); object-fit:contain; }
+        .lightbox .close-btn { position:absolute; top:1rem; right:1.5rem; color:#fff; font-size:2rem; cursor:pointer; background:rgba(255,255,255,0.1); width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:none; transition:background .2s; }
+        .lightbox .close-btn:hover { background:rgba(255,255,255,0.2); }
+        .lightbox .caption { position:absolute; bottom:1.5rem; left:50%; transform:translateX(-50%); color:#ccc; font-size:0.9rem; background:rgba(0,0,0,0.5); padding:0.4rem 1rem; border-radius:6px; max-width:80%; text-align:center; }
+        .step-list { list-style:none; padding:0; counter-reset:step-counter; }
+        .step-list li { counter-increment:step-counter; padding:1rem 1rem 1rem 3rem; background:var(--color-card); border:1px solid var(--color-border); border-radius:8px; margin-bottom:0.75rem; position:relative; transition:box-shadow .2s; }
+        .step-list li:hover { box-shadow:0 2px 8px rgba(0,0,0,0.04); }
+        .step-list li::before { content:counter(step-counter); position:absolute; left:0.75rem; top:50%; transform:translateY(-50%); width:28px; height:28px; background:var(--color-accent); color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.8rem; font-weight:700; }
+        .step-list li strong { color:var(--color-primary); }
+        @media (max-width:768px) {
+            .topbar .hamburger { display:block; }
+            .topbar .project-tagline, .topbar .topbar-right { display:none; }
+            .sidebar { transform:translateX(-100%); }
+            .sidebar.open { transform:translateX(0); }
+            .main-content { margin-left:0; padding:1rem; }
+            header { padding:1.5rem; }
+            header h1 { font-size:1.4rem; }
+            header p { max-width:100%; }
+            table { font-size:0.78rem; }
+            table th, table td { padding:0.4rem 0.5rem; }
+            .lightbox { padding:1rem; }
+            pre { font-size:0.76rem; padding:0.8rem; }
+        }
+        @media (max-width:480px) { .main-content { padding:0.75rem; } header { padding:1.2rem; } header h1 { font-size:1.2rem; } }
+        @media print { .sidebar, .topbar, .lightbox, .copy-btn, .zoom-toolbar { display:none !important; } .main-content { margin-left:0; padding:0; } body { padding-top:0; } pre { white-space:pre-wrap; break-inside:avoid; } }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <button class="hamburger" onclick="toggleSidebar()" aria-label="Abrir menu">&#9776;</button>
+        <span class="project-title">Payment Processor</span>
+        <span class="project-tagline">Sistema de Processamento de Pagamentos</span>
+        <div class="topbar-right"><span>v1.0.0</span></div>
+    </div>
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+    <nav class="sidebar" id="sidebar">
+        <div class="nav-section">
+            <h2>Payment Processor</h2>
+            <ul>
+                <li><a href="index.html"><span class="nav-icon">&#127968;</span> Início</a></li>
+                <li><a href="architecture.html"><span class="nav-icon">&#128202;</span> Arquitetura</a></li>
+                <li><a href="setup.html" class="active"><span class="nav-icon">&#9881;</span> Setup</a></li>
+                <li><a href="observability.html"><span class="nav-icon">&#128200;</span> Observabilidade</a></li>
+            </ul>
+        </div>
+        <div class="nav-section">
+            <h2>Features</h2>
+            <ul>
+                <li><a href="features/payment-consumer.html"><span class="nav-icon">&#9889;</span> Payment Consumer</a></li>
+                <li><a href="features/payment-ui.html"><span class="nav-icon">&#128187;</span> Payment UI</a></li>
+                <li><a href="features/cli-producer.html"><span class="nav-icon">&#128295;</span> CLI Producer</a></li>
+            </ul>
+        </div>
+    </nav>
+    <div class="main-content">
+        <div class="breadcrumb">
+            <a href="index.html">Início</a>
+            <span class="sep">/</span>
+            <span class="current">Setup</span>
+        </div>
+        <header>
+            <h1>Guia de Setup</h1>
+            <p>Instruções completas para configurar e executar o Payment Processor localmente.</p>
+        </header>
+
+        <h2 id="requisitos">Requisitos</h2>
+        <ul>
+            <li><strong>Go</strong> 1.26+</li>
+            <li><strong>Docker</strong> e <strong>Docker Compose</strong> (para serviços locais)</li>
+            <li><strong>Make</strong> (opcional, para usar o Makefile)</li>
+        </ul>
+
+        <h2 id="stack-servicos">Stack de Serviços (Docker Compose)</h2>
+        <p>O arquivo <code>docker-compose.yml</code> sobe todos os serviços necessários:</p>
+        <table>
+            <thead>
+                <tr><th>Serviço</th><th>Imagem</th><th>Portas</th><th>Descrição</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><strong>kafka</strong></td><td><code>apache/kafka:latest</code> (KRaft mode)</td><td><code>9092</code></td><td>Message broker (3 partições padrão)</td></tr>
+                <tr><td><strong>redis</strong></td><td><code>redis:7-alpine</code></td><td><code>6379</code></td><td>Cache de status e idempotência</td></tr>
+                <tr><td><strong>floci</strong></td><td><code>floci/floci:latest</code></td><td><code>4566</code></td><td>DynamoDB Local (compatível AWS)</td></tr>
+                <tr><td><strong>payment-ui</strong></td><td>Build local (<code>Dockerfile.ui</code>)</td><td><code>8081</code></td><td>Interface web de monitoramento</td></tr>
+                <tr><td><strong>otel-collector</strong></td><td><code>otel/opentelemetry-collector-contrib</code></td><td><code>4317</code>, <code>4318</code>, <code>8888</code>, <code>8889</code></td><td>Coleta e exporta telemetria</td></tr>
+            </tbody>
+        </table>
+
+        <img src="diagrams/deployment-architecture.jpg" alt="Diagrama da arquitetura de deploy com Docker Compose" class="diagram-img" onclick="openLightbox(this)">
+        <p class="diagram-caption">Arquitetura de deployment: Kafka, Redis, Floci (DynamoDB Local), OTel Collector e Payment UI em containers Docker, com aplicações executadas localmente.</p>
+
+        <h3 id="diagrama-stack">Diagrama Interativo da Stack</h3>
+        <div class="mermaid-wrapper"><div class="mermaid">
+            graph TB
+                subgraph Docker["Docker Compose — Rede: payment-network (bridge)"]
+                    direction TB
+                    K["Kafka (KRaft) apache/kafka:latest Porta: 9092 3 partições default Sem Zookeeper"]
+                    R["Redis 7 redis:7-alpine Porta: 6379 Status + Idempotência + Pub/Sub"]
+                    F["Floci (DynamoDB Local) floci/floci:latest Porta: 4566 Tabela: payment_history"]
+                    O["OTel Collector otel/opentelemetry-collector-contrib Portas: 4317, 4318, 8888, 8889 Batch: 1s / 1024"]
+                    UI_D["Payment UI (Docker) Dockerfile.ui Porta: 8081 embed.FS frontend"]
+                end
+                subgraph Apps["Aplicações (fora do Docker)"]
+                    direction TB
+                    C["Consumer cmd/consumer Porta: 8080 (health checks) Consumer Group"]
+                    U["UI Server cmd/ui Porta: 8081 REST + SSE"]
+                    P["CLI Producer cmd/producer Flags: --status --count Exit 0 / 1"]
+                end
+                subgraph Ext["Externo"]
+                    B["Navegador localhost:8081 Dashboard"]
+                    T["Terminal make run / run-ui / run-producer"]
+                end
+                K -->|":9092"| C
+                R -->|":6379"| C
+                F -->|":4566"| C
+                O -->|":4317 gRPC"| C
+                O -->|":4317 gRPC"| U
+                K -->|":9092"| P
+                R -->|":6379"| U
+                F -->|":4566"| U
+                UI_D -->|rede compartilhada| U
+                B -->|"HTTP :8081"| UI_D
+                T -->|executa| P
+                T -->|executa| C
+                style K fill:#533483,stroke:#9b59b6,stroke-width:3px
+                style R fill:#1a3a1a,stroke:#2ecc71,stroke-width:3px
+                style F fill:#1a2e1e,stroke:#8bc34a,stroke-width:3px
+                style O fill:#515a5a,stroke:#808b96,stroke-width:3px
+                style UI_D fill:#558b2f,stroke:#8bc34a,stroke-width:2px
+                style C fill:#558b2f,stroke:#8bc34a,stroke-width:3px
+                style U fill:#558b2f,stroke:#8bc34a,stroke-width:3px
+                style P fill:#33691e,stroke:#aed581,stroke-width:3px
+                style B fill:#33691e,stroke:#aed581,stroke-width:2px
+                style T fill:#33691e,stroke:#aed581
+        </div>
+        <p class="mermaid-caption">Stack de serviços Docker (portas e imagens) e suas conexões com as aplicações executadas fora do Docker.</p>
+        </div>
+
+        <div class="mermaid-wrapper"><div class="mermaid">
+            sequenceDiagram
+                participant U as Usuário
+                participant DC as docker-compose
+                participant K as Kafka
+                participant R as Redis
+                participant F as "Floci (DynamoDB)"
+                participant O as OTel Collector
+                participant C as Consumer
+                participant UI as Payment UI
+                participant P as CLI Producer
+
+                U->>DC: docker-compose up -d
+                activate DC
+                DC->>K: start kafka (:9092)
+                activate K
+                K-->>DC: ready
+                deactivate K
+                DC->>R: start redis (:6379)
+                activate R
+                R-->>DC: ready
+                deactivate R
+                DC->>F: start floci (:4566)
+                activate F
+                F-->>DC: ready
+                deactivate F
+                DC->>O: start otel-collector (:4317)
+                activate O
+                O-->>DC: ready
+                deactivate O
+                DC-->>U: serviços prontos
+                deactivate DC
+
+                U->>C: go run ./cmd/consumer
+                activate C
+                Note over C: health checks :8080
+                C->>K: connect consumer group
+                C->>R: connect Redis
+                C->>F: connect DynamoDB
+                C->>O: connect OTLP
+                C-->>U: consumer pronto
+                deactivate C
+
+                U->>UI: go run ./cmd/ui
+                activate UI
+                Note over UI: servidor :8081
+                UI->>R: connect Redis
+                UI->>F: connect DynamoDB
+                UI-->>U: UI pronta
+                deactivate UI
+
+                U->>P: go run ./cmd/producer
+                activate P
+                P->>K: publish(evento)
+                K-->>P: ok
+                P-->>U: evento publicado
+                deactivate P
+        </div>
+        <p class="mermaid-caption">Diagrama de sequência UML — Inicialização completa do ambiente: Docker Compose, serviços, consumer, UI e producer.</p>
+        </div>
+
+        <h3 id="iniciar-servicos">Iniciar serviços</h3>
+        <pre><code># Iniciar todos os serviços
+docker-compose up -d
+
+# Verificar status
+docker-compose ps
+
+# Acompanhar logs
+docker-compose logs -f</code></pre>
+
+        <h3 id="parar-servicos">Parar serviços</h3>
+        <pre><code>docker-compose down</code></pre>
+
+        <h3 id="rede">Rede</h3>
+        <p>Todos os serviços compartilham a rede <code>payment-network</code> (bridge).</p>
+
+        <h2 id="compilacao">Compilação</h2>
+
+        <h3 id="build-consumer">Consumer</h3>
+        <pre><code>make build
+# ou
+go build -o bin/consumer ./cmd/consumer</code></pre>
+
+        <h3 id="build-ui">UI</h3>
+        <pre><code>make build-ui
+# ou
+go build -o bin/ui ./cmd/ui</code></pre>
+
+        <h3 id="build-producer">CLI Producer</h3>
+        <pre><code>make build-producer
+# ou
+go build -o bin/producer ./cmd/producer</code></pre>
+
+        <h2 id="execucao">Execução</h2>
+
+        <ol class="step-list">
+            <li><strong>Iniciar dependências</strong> — <code>docker-compose up -d kafka redis floci otel-collector</code></li>
+            <li><strong>Executar o Consumer</strong> — <code>make run</code> ou <code>go run ./cmd/consumer</code><br>O consumer inicia na porta <code>8080</code> (health checks) e começa a consumir do tópico <code>payment.events</code>.</li>
+            <li><strong>Executar a UI</strong> (separadamente) — <code>make run-ui</code> ou <code>go run ./cmd/ui</code><br>A UI fica disponível em <code>http://localhost:8081</code>.</li>
+            <li><strong>Publicar eventos de teste</strong> — <code>go run ./cmd/producer</code> com flags opcionais como <code>--status failed --amount 50.00 --count 10 --dry-run</code></li>
+        </ol>
+
+        <h3 id="usando-docker-compose">Usando Docker Compose completo (incluindo UI)</h3>
+        <pre><code># Sobe tudo inclusive a UI
+docker-compose up -d
+
+# Compila e executa o consumer localmente
+make run
+
+# OU executa tudo isolado (apenas dependências)
+docker-compose up -d kafka redis floci otel-collector</code></pre>
+
+        <h2 id="variaveis-de-ambiente">Variáveis de Ambiente</h2>
+
+        <h3 id="env-consumer">Consumer</h3>
+        <table>
+            <thead>
+                <tr><th>Variável</th><th>Default</th><th>Descrição</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>KAFKA_BROKERS</code></td><td><code>localhost:9092</code></td><td>Lista de brokers Kafka</td></tr>
+                <tr><td><code>KAFKA_TOPIC</code></td><td><code>payment.events</code></td><td>Tópico de consumo</td></tr>
+                <tr><td><code>KAFKA_DLQ_TOPIC</code></td><td><code>payment.events.dlq</code></td><td>Tópico DLQ</td></tr>
+                <tr><td><code>KAFKA_CONSUMER_GROUP</code></td><td><code>payment-consumer-group</code></td><td>Consumer group ID</td></tr>
+                <tr><td><code>REDIS_ADDR</code></td><td><code>localhost:6379</code></td><td>Endereço Redis</td></tr>
+                <tr><td><code>REDIS_PASSWORD</code></td><td>(vazio)</td><td>Senha Redis</td></tr>
+                <tr><td><code>DYNAMODB_ENDPOINT</code></td><td><code>http://localhost:4566</code></td><td>Endpoint DynamoDB (local)</td></tr>
+                <tr><td><code>DYNAMODB_TABLE</code></td><td><code>payment_history</code></td><td>Tabela DynamoDB</td></tr>
+                <tr><td><code>WORKER_COUNT</code></td><td><code>10</code></td><td>Número de workers concorrentes</td></tr>
+                <tr><td><code>IDEMPOTENCY_TTL_HOURS</code></td><td><code>24</code></td><td>TTL da chave de idempotência (horas)</td></tr>
+                <tr><td><code>STATUS_TTL_HOURS</code></td><td><code>168</code></td><td>TTL do status no Redis (7 dias)</td></tr>
+                <tr><td><code>RETRY_MAX_ATTEMPTS</code></td><td><code>3</code></td><td>Máximo de tentativas de retry</td></tr>
+                <tr><td><code>RETRY_BASE_DELAY_MS</code></td><td><code>100</code></td><td>Delay base do backoff (ms)</td></tr>
+                <tr><td><code>OTEL_EXPORTER_OTLP_ENDPOINT</code></td><td><code>localhost:4317</code></td><td>Endpoint OTel collector</td></tr>
+                <tr><td><code>OTEL_SERVICE_NAME</code></td><td><code>payment-consumer</code></td><td>Nome do serviço para tracing</td></tr>
+                <tr><td><code>GRACEFUL_SHUTDOWN_TIMEOUT</code></td><td><code>30s</code></td><td>Timeout para graceful shutdown</td></tr>
+                <tr><td><code>SERVER_PORT</code></td><td><code>8080</code></td><td>Porta do servidor HTTP (health check)</td></tr>
+            </tbody>
+        </table>
+
+        <h3 id="env-ui">UI</h3>
+        <table>
+            <thead>
+                <tr><th>Variável</th><th>Default</th><th>Descrição</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>UI_PORT</code></td><td><code>8081</code></td><td>Porta do servidor HTTP</td></tr>
+                <tr><td><code>UI_EVENT_BUS_BUFFER</code></td><td><code>256</code></td><td>Tamanho do buffer do Event Bus</td></tr>
+                <tr><td><code>UI_READ_TIMEOUT</code></td><td><code>10s</code></td><td>Timeout de leitura HTTP</td></tr>
+                <tr><td><code>UI_WRITE_TIMEOUT</code></td><td><code>30s</code></td><td>Timeout de escrita HTTP (SSE)</td></tr>
+                <tr><td><code>REDIS_ADDR</code></td><td><code>localhost:6379</code></td><td>Endereço Redis (compartilhado)</td></tr>
+                <tr><td><code>REDIS_PASSWORD</code></td><td>(vazio)</td><td>Senha Redis (compartilhado)</td></tr>
+                <tr><td><code>DYNAMODB_ENDPOINT</code></td><td><code>http://localhost:4566</code></td><td>Endpoint DynamoDB (compartilhado)</td></tr>
+                <tr><td><code>DYNAMODB_TABLE</code></td><td><code>payment_history</code></td><td>Tabela DynamoDB (compartilhado)</td></tr>
+            </tbody>
+        </table>
+
+        <h2 id="configuracao-yaml">Configuração via Arquivo YAML</h2>
+        <p>O projeto também suporta configuração via <code>config.yaml</code>:</p>
+        <pre><code>server:
+  port: 8080</code></pre>
+        <p>As variáveis de ambiente sobrescrevem as configurações do arquivo. O arquivo é opcional — se não existir, os defaults são aplicados.</p>
+
+        <h2 id="testes">Testes</h2>
+        <pre><code># Executar todos os testes com race detector
+make test
+
+# Ou diretamente
+go test ./... -race -count=1 -timeout=120s
+
+# Executar lint
+make lint</code></pre>
+
+        <h2 id="dockerfiles">Dockerfiles</h2>
+
+        <h3 id="dockerfile-consumer">Consumer (Dockerfile)</h3>
+        <pre><code>docker build -t payment-consumer -f Dockerfile .
+docker run --network=host payment-consumer</code></pre>
+
+        <h3 id="dockerfile-ui">UI (Dockerfile.ui)</h3>
+        <pre><code>docker build -t payment-ui -f Dockerfile.ui .
+docker run --network=host payment-ui</code></pre>
+
+        <h2 id="troubleshooting">Troubleshooting</h2>
+
+        <h3 id="kafka-nao-conecta">Kafka não conecta</h3>
+        <p>Verifique se o Kafka está saudável:</p>
+        <pre><code>docker-compose logs kafka</code></pre>
+
+        <h3 id="redis-nao-responde">Redis não responde</h3>
+        <pre><code>docker-compose exec redis redis-cli PING
+# Deve retornar PONG</code></pre>
+
+        <h3 id="dynamodb-indisponivel">DynamoDB não disponível</h3>
+        <pre><code># Listar tabelas
+docker-compose exec floci awslocal dynamodb list-tables
+# Deve retornar "payment_history"</code></pre>
+
+        <h3 id="erro-configuracao">Erro de configuração</h3>
+        <p>Certifique-se de que as variáveis de ambiente estão corretas, especialmente ao rodar fora do Docker Compose (endereços <code>localhost</code> vs nomes de serviço Docker).</p>
+
+        <div class="footer">
+            <p>Payment Processor - Documentação Técnica</p>
+            <div class="footer-links">
+                <a href="index.html">Início</a>
+                <a href="architecture.html">Arquitetura</a>
+                <a href="setup.html">Setup</a>
+                <a href="observability.html">Observabilidade</a>
+                <a href="features/payment-consumer.html">Consumer</a>
+                <a href="features/payment-ui.html">UI</a>
+                <a href="features/cli-producer.html">CLI</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+        <button class="close-btn" onclick="closeLightboxDirect()">&times;</button>
+        <img id="lightboxImg" src="" alt="">
+        <div class="caption" id="lightboxCaption"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({startOnLoad:true,securityLevel:'loose',theme:'dark',themeVariables:{primaryColor:'#1a2e20',primaryTextColor:'#e0e0e0',primaryBorderColor:'#4a5a4a',lineColor:'#6a7a6a',secondaryColor:'#1a3620',tertiaryColor:'#33691e',fontSize:'14px'},flowchart:{useMaxWidth:true,htmlLabels:true,curve:'basis'}});
+        function openLightbox(img){var lb=document.getElementById('lightbox'),lbImg=document.getElementById('lightboxImg'),lbCap=document.getElementById('lightboxCaption');lbImg.src=img.src;var cap=img.nextElementSibling;if(cap&&cap.classList.contains('diagram-caption'))lbCap.textContent=cap.textContent;else lbCap.textContent='';lb.classList.add('open');document.body.style.overflow='hidden';}
+        function closeLightbox(e){if(e.target===e.currentTarget)closeLightboxDirect();}
+        function closeLightboxDirect(){document.getElementById('lightbox').classList.remove('open');document.body.style.overflow='';}
+        document.addEventListener('keydown',function(e){if(e.key==='Escape')closeLightboxDirect();});
+        function addCopyButtons(){document.querySelectorAll('pre').forEach(function(pre){if(pre.querySelector('.copy-btn'))return;var btn=document.createElement('button');btn.className='copy-btn';btn.textContent='Copy';btn.onclick=function(){var code=pre.querySelector('code'),text=code?code.textContent:pre.textContent;navigator.clipboard.writeText(text).then(function(){btn.textContent='Copied!';btn.classList.add('copied');setTimeout(function(){btn.textContent='Copy';btn.classList.remove('copied')},2000)}).catch(function(){btn.textContent='Failed';setTimeout(function(){btn.textContent='Copy'},2000)})};pre.appendChild(btn)})}
+        function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebarOverlay').classList.toggle('open')}
+        function initZoom(){var wrappers=document.querySelectorAll('.mermaid-wrapper');if(wrappers.length===0){setTimeout(initZoom,300);return}wrappers.forEach(function(wrapper){var svg=wrapper.querySelector('svg');if(!svg)return;svg.style.transformOrigin='0 0';var scale=1,tx=0,ty=0,panning=false,sx=0,sy=0;function update(){svg.style.transform='translate('+tx+'px,'+ty+'px) scale('+scale+')'};var tb=document.createElement('div');tb.className='zoom-toolbar';var bi=document.createElement('button');bi.textContent='+';bi.onclick=function(){scale=Math.min(scale*1.4,10);update()};var bo=document.createElement('button');bo.textContent='−';bo.onclick=function(){scale=Math.max(scale/1.4,0.3);update()};var br=document.createElement('button');br.textContent='↺';br.onclick=function(){scale=1;tx=0;ty=0;update()};tb.appendChild(bi);tb.appendChild(bo);tb.appendChild(br);wrapper.appendChild(tb);svg.addEventListener('mousedown',function(e){panning=true;sx=e.clientX-tx;sy=e.clientY-ty;svg.style.cursor='grabbing'});document.addEventListener('mousemove',function(e){if(!panning)return;tx=e.clientX-sx;ty=e.clientY-sy;update()});document.addEventListener('mouseup',function(){panning=false;svg.style.cursor='grab'});wrapper.addEventListener('wheel',function(e){e.preventDefault();var d=e.deltaY>0?1/1.1:1.1;scale=Math.max(0.3,Math.min(10,scale*d));update()},{passive:false})})}
+        if(document.readyState==='complete'){setTimeout(function(){initZoom();addCopyButtons()},500)}else{window.addEventListener('load',function(){setTimeout(function(){initZoom();addCopyButtons()},500)})}
+    </script>
+</body>
+</html>

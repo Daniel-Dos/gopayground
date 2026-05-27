@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guia da Producer UI — Payment Processor</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #0d1117;
+            --bg-card: #161b22;
+            --bg-card-hover: #1c2333;
+            --bg-code: #1a1f2e;
+            --border: #30363d;
+            --text: #e6edf3;
+            --text-muted: #8b949e;
+            --accent: #58a6ff;
+            --green: #3fb950;
+            --green-bg: rgba(63, 185, 80, 0.12);
+            --red: #f85149;
+            --red-bg: rgba(248, 81, 73, 0.12);
+            --yellow: #d29922;
+            --yellow-bg: rgba(210, 153, 34, 0.12);
+            --blue: #58a6ff;
+            --purple: #bc8cff;
+            --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            --mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Consolas', monospace;
+            --radius: 8px;
+        }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            font-size: 15px;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem 4rem;
+        }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; color: #79c0ff; }
+
+        header {
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        header h1 {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 0.3rem;
+            background: linear-gradient(135deg, var(--accent), var(--purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        header p { color: var(--text-muted); font-size: 1rem; }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+        .breadcrumb a { color: var(--accent); }
+        .breadcrumb .sep { font-size: 0.75rem; }
+
+        h2 {
+            font-size: 1.4rem;
+            margin-top: 2rem;
+            margin-bottom: 0.8rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.4rem;
+            scroll-margin-top: 1rem;
+        }
+        h3 { font-size: 1.1rem; margin-top: 1.5rem; margin-bottom: 0.6rem; }
+        p { margin-bottom: 1rem; }
+        ul, ol { margin-bottom: 1rem; padding-left: 1.8rem; }
+        li { margin-bottom: 0.3rem; }
+
+        pre {
+            background: var(--bg-code);
+            color: #e6edf3;
+            padding: 0.8rem 1rem;
+            border-radius: var(--radius);
+            overflow-x: auto;
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            line-height: 1.55;
+            margin-bottom: 1.2rem;
+            border: 1px solid var(--border);
+        }
+        code {
+            font-family: var(--mono);
+            font-size: 0.85rem;
+            background: rgba(88, 166, 255, 0.1);
+            padding: 0.1rem 0.35rem;
+            border-radius: 3px;
+            color: var(--accent);
+        }
+        pre code {
+            background: transparent;
+            padding: 0;
+            color: inherit;
+            font-size: inherit;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.2rem;
+            font-size: 0.88rem;
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+        table th, table td {
+            border: 1px solid var(--border);
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+        }
+        table th {
+            background: var(--bg-card);
+            font-weight: 600;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+        }
+        table tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+        table tr:hover { background: rgba(255,255,255,0.04); }
+
+        .info-box {
+            border-left: 3px solid var(--accent);
+            padding: 0.75rem 1rem;
+            margin-bottom: 1rem;
+            background: rgba(88, 166, 255, 0.06);
+            border-radius: 0 var(--radius) var(--radius) 0;
+        }
+        .info-box p { margin-bottom: 0; }
+        .info-box.warn { border-left-color: var(--yellow); background: var(--yellow-bg); }
+        .info-box.good { border-left-color: var(--green); background: var(--green-bg); }
+        .info-box.err { border-left-color: var(--red); background: var(--red-bg); }
+
+        .badge {
+            display: inline-block;
+            padding: 0.1rem 0.5rem;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+        .badge-green { background: var(--green-bg); color: var(--green); }
+        .badge-red { background: var(--red-bg); color: var(--red); }
+
+        .step {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.8rem;
+            padding: 0.8rem;
+            margin-bottom: 0.6rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+        .step .num {
+            flex-shrink: 0;
+            width: 28px; height: 28px;
+            background: var(--accent);
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+        .step .content { flex: 1; }
+        .step .content strong { display: block; margin-bottom: 0.1rem; }
+        .step .content p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0; }
+
+        .screenshot-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            margin-bottom: 1.2rem;
+            text-align: center;
+        }
+        .screenshot-box .mock {
+            background: linear-gradient(135deg, #161b22 0%, #1c2333 100%);
+            border-radius: 6px;
+            padding: 1rem;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+        .screenshot-box .mock .mock-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 0.5rem;
+            color: var(--text);
+        }
+        .screenshot-box .mock .mock-header .brand { font-weight: 700; }
+        .screenshot-box .mock .mock-header .nav span { margin-left: 0.8rem; font-size: 0.82rem; color: var(--text-muted); }
+        .screenshot-box .mock .mock-header .nav .active { color: var(--accent); }
+        .screenshot-box .mock .mock-body {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            text-align: left;
+        }
+        .screenshot-box .mock .mock-body .field { padding: 0.3rem 0; }
+        .screenshot-box .mock .mock-body .field .label { font-size: 0.72rem; color: var(--text-muted); }
+        .screenshot-box .mock .mock-body .field .value {
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            color: var(--text);
+            background: var(--bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        .screenshot-box .mock .preview-placeholder {
+            background: var(--bg);
+            border: 1px dashed var(--border);
+            border-radius: 4px;
+            padding: 0.4rem 0.6rem;
+            font-family: var(--mono);
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+
+        hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+        .bottom-nav {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+        .bottom-nav a {
+            padding: 0.4rem 0.8rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 0.88rem;
+            transition: border-color 0.2s;
+        }
+        .bottom-nav a:hover { border-color: var(--accent); text-decoration: none; }
+
+        @media (max-width: 600px) {
+            body { padding: 1rem 0.75rem 3rem; }
+            header h1 { font-size: 1.5rem; }
+            .screenshot-box .mock .mock-body { grid-template-columns: 1fr; }
+            table { font-size: 0.8rem; }
+            table th, table td { padding: 0.35rem 0.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+<nav class="breadcrumb">
+    <a href="index.html">Documentacao</a>
+    <span class="sep">/</span>
+    <span>Guia da Producer UI</span>
+</nav>
+
+<header>
+    <h1>Guia da Producer UI</h1>
+    <p>Como publicar eventos de pagamento no Kafka diretamente do navegador.</p>
+</header>
+
+<!-- ============ INTRODUCAO ============ -->
+<h2>Introducao</h2>
+
+<p>A <strong>Producer UI</strong> e uma interface web que permite publicar eventos de pagamento no Kafka sem precisar abrir o terminal. Ela e servida pelo proprio servidor da UI (<code>cmd/ui</code>) na porta 8081.</p>
+
+<div class="info-box good">
+    <strong>Acesso:</strong> <a href="http://localhost:8081/producer" target="_blank">http://localhost:8081/producer</a>
+</div>
+
+<p>A pagina oferece:</p>
+<ul>
+    <li>Formulario completo com todos os campos do evento de pagamento</li>
+    <li>Preview JSON ao vivo enquanto voce digita</li>
+    <li>Publicacao de evento unico ou 10 eventos aleatorios</li>
+    <li>Tabela de historico com as ultimas 50 publicacoes da sessao</li>
+    <li>Notificacoes visuais (toasts) de sucesso e erro</li>
+</ul>
+
+<!-- ============ FORMULARIO ============ -->
+<h2>Formulario de Publicacao</h2>
+
+<p>Ao acessar a pagina, voce encontra o formulario com os seguintes campos:</p>
+
+<table>
+    <thead>
+        <tr><th>Campo</th><th>Tipo</th><th>Obrigatorio</th><th>Observacao</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>ID do Pagamento</strong></td>
+            <td>Texto</td>
+            <td>Nao</td>
+            <td>UUID v4. Se deixado em branco, um UUID e gerado automaticamente pelo servidor.</td>
+        </tr>
+        <tr>
+            <td><strong>Situacao</strong></td>
+            <td>Select</td>
+            <td>Sim</td>
+            <td>Opcoes: Pendente, Confirmado, Falhou, Reembolsado. Padrao: Confirmado.</td>
+        </tr>
+        <tr>
+            <td><strong>Valor</strong></td>
+            <td>Numero</td>
+            <td>Sim</td>
+            <td>Deve ser maior que zero. Aceita ate 2 casas decimais.</td>
+        </tr>
+        <tr>
+            <td><strong>Moeda</strong></td>
+            <td>Texto</td>
+            <td>Sim</td>
+            <td>Codigo ISO 4217 de 3 letras (ex: BRL, USD, EUR). Maiusculo automatico.</td>
+        </tr>
+        <tr>
+            <td><strong>Descricao</strong></td>
+            <td>Texto</td>
+            <td>Nao</td>
+            <td>Maximo 255 caracteres. Opcional.</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="screenshot-box">
+    <div class="mock">
+        <div class="mock-header">
+            <span class="brand">&#9673; Producer de Pagamentos</span>
+            <div class="nav">
+                <span>Dashboard</span>
+                <span class="active">Producer</span>
+            </div>
+        </div>
+        <div class="mock-body">
+            <div class="field">
+                <div class="label">ID do Pagamento</div>
+                <span class="value">[auto-gerado se vazio]</span>
+            </div>
+            <div class="field">
+                <div class="label">Situacao</div>
+                <span class="value">Confirmado &#9660;</span>
+            </div>
+            <div class="field">
+                <div class="label">Valor</div>
+                <span class="value">150.00</span>
+            </div>
+            <div class="field">
+                <div class="label">Moeda</div>
+                <span class="value">BRL</span>
+            </div>
+            <div class="field" style="grid-column: span 2;">
+                <div class="label">Descricao</div>
+                <span class="value">Pedido #12345</span>
+            </div>
+        </div>
+        <div class="preview-placeholder">
+{ "payment_id": "&lt;auto-gerado&gt;", "status": "confirmed", "amount": 150.00, "currency": "BRL", ... }
+        </div>
+    </div>
+    <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.5rem;">Ilustracao do layout da Producer UI com formulario e preview JSON.</p>
+</div>
+
+<!-- ============ PREVIEW ============ -->
+<h2>Preview JSON ao Vivo</h2>
+
+<p>Ao lado (ou abaixo, em mobile) do formulario, ha um bloco de <strong>pre-visualizacao JSON</strong> que se atualiza em tempo real conforme voce preenche os campos. Isso permite ver exatamente como os dados serao enviados antes de clicar em "Publicar".</p>
+
+<p>O preview destaca:</p>
+<ul>
+    <li>Valores em <span style="color: var(--accent);">azul</span> para strings</li>
+    <li>Valores em <span style="color: var(--yellow);">amarelo</span> para numeros</li>
+    <li>O texto <code>&lt;auto-gerado&gt;</code> quando o campo Payment ID esta vazio</li>
+</ul>
+
+<!-- ============ PUBLICAR UNICO ============ -->
+<h2>Como Publicar um Evento Unico</h2>
+
+<ol>
+    <li>Preencha os campos do formulario (ou deixe Payment ID em branco para auto-gerar)</li>
+    <li>Confira o preview JSON ao lado para garantir que os dados estao corretos</li>
+    <li>Clique no botao <strong>"Publicar"</strong> (ou pressione <kbd>Ctrl</kbd>+<kbd>Enter</kbd>)</li>
+</ol>
+
+<p>Apos o envio:</p>
+<ul>
+    <li><span class="badge badge-green">Sucesso:</span> Um toast verde aparece com os primeiros caracteres do Payment ID. Uma nova linha e adicionada na tabela de "Ultimas Publicacoes" com a particao e o offset retornados pelo Kafka.</li>
+    <li><span class="badge badge-red">Erro:</span> Um toast vermelho exibe a mensagem de erro. O formulario mantem os dados preenchidos para que voce possa corrigir e tentar novamente.</li>
+</ul>
+
+<div class="info-box good">
+    <strong>Dica:</strong> Use o atalho <kbd>Ctrl</kbd>+<kbd>Enter</kbd> para publicar mais rapidamente sem precisar clicar no botao.
+</div>
+
+<!-- ============ PUBLICAR BULK ============ -->
+<h2>Como Publicar 10 Eventos Aleatorios</h2>
+
+<p>Para testar o sistema com multiplos eventos de uma vez, clique no botao <strong>"Publicar 10 Aleatorios"</strong>.</p>
+
+<p>O que acontece:</p>
+<ol>
+    <li>O frontend envia uma requisicao <code>POST /api/publish/bulk</code> com <code>{"count": 10}</code></li>
+    <li>O backend gera 10 eventos aleatorios usando <code>producer.GenerateBulkEvents(10)</code></li>
+    <li>Cada evento e publicado no Kafka individualmente</li>
+    <li>O resultado e um array com partition e offset para cada evento</li>
+    <li>Os eventos bem-sucedidos sao adicionados a tabela de historico</li>
+</ol>
+
+<p>O toast de resultado mostra um resumo, por exemplo: <em>"9 evento(s) publicado(s) com sucesso. 1 falha(s)."</em></p>
+
+<div class="info-box warn">
+    <strong>Nota:</strong> O botao fica desabilitado durante o processamento. Eventos com falha sao exibidos com erro na tabela de historico.
+</div>
+
+<!-- ============ RESULTADOS ============ -->
+<h2>Entendendo os Resultados</h2>
+
+<p>Apos uma publicacao bem-sucedida, o servidor retorna tres informacoes importantes:</p>
+
+<table>
+    <thead>
+        <tr><th>Campo</th><th>Descricao</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><strong>payment_id</strong></td><td>UUID do pagamento que foi publicado</td></tr>
+        <tr><td><strong>partition</strong></td><td>Numero da particao do Kafka onde o evento foi armazenado</td></tr>
+        <tr><td><strong>offset</strong></td><td>Posicao do evento dentro da particao (incrementado a cada nova mensagem)</td></tr>
+    </tbody>
+</table>
+
+<p>Esses dados aparecem na tabela de "Ultimas Publicacoes" e permitem rastrear o evento no Kafka.</p>
+
+<!-- ============ HISTORICO ============ -->
+<h2>Historico de Sessao</h2>
+
+<p>A tabela de "Ultimas Publicacoes" mantem um registro de todos os eventos que voce publicou durante a sessao atual. As colunas sao:</p>
+
+<ul>
+    <li><strong>ID</strong> — Payment ID do evento (truncado se muito longo)</li>
+    <li><strong>Situacao</strong> — Status do evento (Confirmado, Falhou, etc.) com badge colorido</li>
+    <li><strong>Valor</strong> — Valor em Reais ou outra moeda</li>
+    <li><strong>Particao</strong> — Particao do Kafka onde foi publicado</li>
+    <li><strong>Offset</strong> — Offset dentro da particao</li>
+    <li><strong>Data/Hora</strong> — Timestamp da publicacao formatado em pt-BR</li>
+</ul>
+
+<p>Caracteristicas do historico:</p>
+<ul>
+    <li>Armazenado em <code>sessionStorage</code> do navegador (persiste durante a sessao, mas e perdido ao fechar a aba)</li>
+    <li>Limite de 50 eventos (os mais antigos sao descartados automaticamente)</li>
+    <li>Ordenado do mais recente para o mais antigo</li>
+    <li>Botao "Limpar Historico" para remover todos os registros</li>
+</ul>
+
+<!-- ============ ERROS ============ -->
+<h2>Cenarios de Erro</h2>
+
+<table>
+    <thead>
+        <tr><th>Cenario</th><th>O que aparece</th><th>O que fazer</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Kafka indisponivel</strong></td>
+            <td>Toast vermelho: "Falha ao publicar: kafka not available"</td>
+            <td>Verifique se o Kafka esta rodando. A UI funciona mesmo sem Kafka — apenas a publicacao e afetada.</td>
+        </tr>
+        <tr>
+            <td><strong>Valor invalido (<= 0)</strong></td>
+            <td>Validacao frontend impede o envio. Toast vermelho: "Valor deve ser maior que zero."</td>
+            <td>Digite um valor valido (ex: 100.00).</td>
+        </tr>
+        <tr>
+            <td><strong>Moeda invalida</strong></td>
+            <td>Validacao frontend: "Moeda deve ter exatamente 3 letras (ex: BRL, USD, EUR)."</td>
+            <td>Digite um codigo ISO 4217 valido com exatamente 3 caracteres.</td>
+        </tr>
+        <tr>
+            <td><strong>UUID invalido</strong></td>
+            <td>Validacao frontend: "ID do pagamento invalido. Deve ser um UUID valido."</td>
+            <td>Corrija o UUID ou deixe o campo vazio para auto-gerar.</td>
+        </tr>
+        <tr>
+            <td><strong>Descricao muito longa</strong></td>
+            <td>Validacao frontend: "Descricao muito longa (maximo 255 caracteres)."</td>
+            <td>Reduza a descricao para no maximo 255 caracteres.</td>
+        </tr>
+        <tr>
+            <td><strong>Erro no servidor</strong></td>
+            <td>Toast vermelho com o codigo do erro HTTP</td>
+            <td>Verifique os logs do servidor para mais detalhes.</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="info-box err">
+    <strong>Importante:</strong> Em caso de erro, o formulario <strong>nao</strong> e limpo — seus dados permanecem para que voce possa corrigir e tentar novamente.
+</div>
+
+<!-- ============ NAVEGACAO ============ -->
+<h2>Navegacao entre Paginas</h2>
+
+<p>O header da pagina possui dois links de navegacao:</p>
+<ul>
+    <li><strong>Dashboard</strong> (<code>/</code>) — Leva para a pagina de monitoramento com feed SSE, lista de pagamentos e metricas</li>
+    <li><strong>Producer</strong> (<code>/producer</code>) — Volta para a pagina de publicacao (destacado quando ativo)</li>
+</ul>
+
+<p>Isso permite que voce publique um evento e rapidamente va para a Dashboard para ve-lo sendo processado em tempo real.</p>
+
+<!-- ============ DICAS ============ -->
+<h2>Dicas e Boas Praticas</h2>
+
+<ul>
+    <li><strong>Use o preview JSON</strong> para validar os dados antes de publicar — isso evita erros de formatacao</li>
+    <li><strong>Deixe o Payment ID vazio</strong> se nao precisar de um ID especifico — o servidor gera um UUID automaticamente</li>
+    <li><strong>Use "Publicar 10 Aleatorios"</strong> para gerar dados de teste rapidamente e ver o fluxo completo funcionando</li>
+    <li><strong>Combine com a Dashboard</strong> — publique um evento e va para a Dashboard para ve-lo sendo processado em tempo real via SSE</li>
+    <li><strong>O historico e por sessao</strong> — fechar a aba perde os registros. Use o CLI Producer se precisar de persistencia.</li>
+</ul>
+
+<!-- ============ ESPECIFICACOES TECNICAS ============ -->
+<h2>Especificacoes Tecnicas</h2>
+
+<table>
+    <thead>
+        <tr><th>Item</th><th>Detalhe</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><strong>Endpoint unico</strong></td><td><code>POST /api/publish</code> — payload maximo 64KB, timeout 10s</td></tr>
+        <tr><td><strong>Endpoint bulk</strong></td><td><code>POST /api/publish/bulk</code> — payload maximo 4KB, timeout total 30s</td></tr>
+        <tr><td><strong>Content-Type</strong></td><td>Deve ser <code>application/json</code> (415 se invalido)</td></tr>
+        <tr><td><strong>Kafka indisponivel</strong></td><td>Retorna 502 — UI continua operacional, apenas publicacao afetada</td></tr>
+        <tr><td><strong>Armazenamento</strong></td><td>Historico em <code>sessionStorage</code> (maximo 50 entradas)</td></tr>
+        <tr><td><strong>Idioma</strong></td><td>Portugues-Brasil (pt-BR)</td></tr>
+        <tr><td><strong>Dependencias</strong></td><td>Zero frameworks — HTML + CSS + JS vanilla</td></tr>
+    </tbody>
+</table>
+
+<hr>
+
+<div class="info-box">
+    <strong>Veja tambem:</strong>
+    <a href="index.html">Documentacao completa do sistema</a> —
+    <a href="features/cli-producer.html">CLI Producer (alternativa via terminal)</a>
+</div>
+
+<div class="bottom-nav">
+    <a href="index.html">&#8592; Documentacao</a>
+    <a href="features/payment-ui.html" class="next">Dashboard UI &#8594;</a>
+</div>
+
+<script>
+// Add copy buttons to code blocks
+document.querySelectorAll('pre').forEach(function (pre) {
+    var btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copiar';
+    btn.style.cssText = 'position:absolute;top:0.5rem;right:0.5rem;background:var(--bg-card);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;font-size:0.72rem;padding:0.2rem 0.5rem;border-radius:4px;opacity:0;transition:opacity 0.2s;font-family:var(--font);';
+    pre.style.position = 'relative';
+    pre.appendChild(btn);
+    pre.addEventListener('mouseenter', function () { btn.style.opacity = '1'; });
+    pre.addEventListener('mouseleave', function () { if (!btn.classList.contains('copied')) btn.style.opacity = '0'; });
+    btn.addEventListener('click', function () {
+        var text = pre.querySelector('code') ? pre.querySelector('code').textContent : pre.textContent;
+        navigator.clipboard.writeText(text).then(function () {
+            btn.textContent = 'Copiado!';
+            btn.classList.add('copied');
+            btn.style.opacity = '1';
+            setTimeout(function () {
+                btn.textContent = 'Copiar';
+                btn.classList.remove('copied');
+                btn.style.opacity = '0';
+            }, 2000);
+        });
+    });
+});
+</script>
+
+</body>
+</html>

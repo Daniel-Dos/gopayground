@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Processor — Documentacao Tecnica</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #0d1117;
+            --bg-card: #161b22;
+            --bg-card-hover: #1c2333;
+            --bg-code: #1a1f2e;
+            --bg-input: #0d1117;
+            --border: #30363d;
+            --border-accent: #3b82b5;
+            --text: #e6edf3;
+            --text-muted: #8b949e;
+            --text-dim: #484f58;
+            --accent: #58a6ff;
+            --accent-emphasis: #1f6feb;
+            --green: #3fb950;
+            --green-bg: rgba(63, 185, 80, 0.12);
+            --red: #f85149;
+            --red-bg: rgba(248, 81, 73, 0.12);
+            --yellow: #d29922;
+            --yellow-bg: rgba(210, 153, 34, 0.12);
+            --blue: #58a6ff;
+            --purple: #bc8cff;
+            --orange: #d4760e;
+            --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            --mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Consolas', monospace;
+            --radius: 8px;
+            --sidebar-w: 260px;
+            --topbar-h: 52px;
+        }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            font-size: 15px;
+            display: flex;
+            min-height: 100vh;
+            padding-top: var(--topbar-h);
+        }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; color: #79c0ff; }
+
+        /* --- Topbar --- */
+        .topbar {
+            position: fixed; top: 0; left: 0; right: 0;
+            height: var(--topbar-h);
+            background: #0d1117;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 1.25rem;
+            z-index: 200;
+            gap: 0.75rem;
+        }
+        .topbar .logo {
+            display: flex; align-items: center; gap: 0.5rem;
+            font-weight: 700; font-size: 0.95rem;
+            color: var(--text);
+        }
+        .topbar .logo span { color: var(--accent); }
+        .topbar .hamburger {
+            display: none; background: none; border: none;
+            color: var(--text); font-size: 1.4rem; cursor: pointer;
+            padding: 0.25rem 0.5rem; border-radius: 4px;
+        }
+        .topbar .hamburger:hover { background: var(--bg-card); }
+        .topbar .topbar-right {
+            margin-left: auto;
+            display: flex; align-items: center; gap: 1rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        .topbar .topbar-right .tag {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 0.15rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.72rem;
+        }
+        .topbar-back {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            text-decoration: none;
+            padding: 4px 10px;
+            border-radius: 6px;
+            transition: all 0.2s;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .topbar-back:hover {
+            color: var(--accent);
+            background: var(--bg-card);
+            text-decoration: none;
+        }
+        .topbar-ui-link {
+            color: var(--accent);
+            font-weight: 600;
+            font-size: 0.82rem;
+            text-decoration: none;
+            padding: 2px 10px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .topbar-ui-link:hover {
+            background: rgba(88, 166, 255, 0.12);
+            text-decoration: none;
+        }
+
+        /* --- Sidebar --- */
+        .sidebar-overlay {
+            display: none; position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6); z-index: 98;
+        }
+        .sidebar-overlay.open { display: block; }
+        .sidebar {
+            width: var(--sidebar-w);
+            background: #0d1117;
+            border-right: 1px solid var(--border);
+            padding: 1rem 0;
+            position: fixed;
+            top: var(--topbar-h);
+            left: 0; bottom: 0;
+            overflow-y: auto;
+            z-index: 99;
+            transition: transform 0.3s ease;
+        }
+        .sidebar::-webkit-scrollbar { width: 6px; }
+        .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        .sidebar h3 {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            padding: 0.75rem 1rem 0.4rem;
+            font-weight: 600;
+        }
+        .sidebar ul { list-style: none; padding: 0; }
+        .sidebar ul li a {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.35rem 1rem;
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-left: 3px solid transparent;
+            transition: background 0.15s, color 0.15s;
+        }
+        .sidebar ul li a:hover {
+            background: var(--bg-card);
+            color: var(--text);
+        }
+        .sidebar ul li a.active {
+            background: var(--bg-card);
+            color: var(--accent);
+            border-left-color: var(--accent);
+        }
+        .sidebar ul li a .icon { width: 1.2rem; text-align: center; font-size: 0.9rem; opacity: 0.7; }
+        .sidebar ul li a.active .icon { opacity: 1; }
+
+        /* --- Main Content --- */
+        .main-content {
+            margin-left: var(--sidebar-w);
+            flex: 1;
+            padding: 1.5rem 2.5rem 3rem;
+            max-width: 960px;
+        }
+        .main-content > header {
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .main-content > header h1 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            margin-bottom: 0.3rem;
+            background: linear-gradient(135deg, var(--accent), var(--purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .main-content > header p {
+            color: var(--text-muted);
+            font-size: 1rem;
+            max-width: 80%;
+        }
+
+        h1, h2, h3, h4 { margin-top: 2rem; margin-bottom: 0.8rem; font-weight: 700; line-height: 1.3; }
+        h1 { font-size: 1.8rem; }
+        h2 {
+            font-size: 1.4rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.4rem;
+            scroll-margin-top: calc(var(--topbar-h) + 1rem);
+        }
+        h3 { font-size: 1.15rem; scroll-margin-top: calc(var(--topbar-h) + 1rem); }
+        h4 { font-size: 1rem; }
+        p { margin-bottom: 1rem; }
+        ul, ol { margin-bottom: 1rem; padding-left: 1.8rem; }
+        li { margin-bottom: 0.25rem; }
+
+        /* --- Cards --- */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.25rem;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .feature-card:hover {
+            border-color: var(--accent);
+            background: var(--bg-card-hover);
+        }
+        .feature-card .card-icon { font-size: 1.6rem; margin-bottom: 0.5rem; }
+        .feature-card h4 { margin: 0 0 0.4rem; color: var(--text); }
+        .feature-card p { font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+        .feature-card a { font-size: 0.85rem; font-weight: 600; }
+
+        /* --- Tables --- */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+            font-size: 0.88rem;
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+        table th, table td {
+            border: 1px solid var(--border);
+            padding: 0.55rem 0.8rem;
+            text-align: left;
+        }
+        table th {
+            background: var(--bg-card);
+            font-weight: 600;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+        }
+        table tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+        table tr:hover { background: rgba(255,255,255,0.04); }
+        table td code { font-size: 0.82rem; }
+
+        /* --- Code --- */
+        pre {
+            background: var(--bg-code);
+            color: #e6edf3;
+            padding: 1rem 1.2rem;
+            border-radius: var(--radius);
+            overflow-x: auto;
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            line-height: 1.55;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+            position: relative;
+        }
+        code {
+            font-family: var(--mono);
+            font-size: 0.85rem;
+            background: rgba(88, 166, 255, 0.1);
+            padding: 0.1rem 0.35rem;
+            border-radius: 3px;
+            color: var(--accent);
+        }
+        pre code {
+            background: transparent;
+            padding: 0;
+            color: inherit;
+            font-size: inherit;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.72rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            font-family: var(--font);
+        }
+        pre:hover .copy-btn { opacity: 1; }
+        .copy-btn:hover { border-color: var(--accent); color: var(--text); }
+        .copy-btn.copied { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+
+        /* --- Blockquote / Info --- */
+        blockquote, .info-box {
+            border-left: 3px solid var(--accent);
+            padding: 0.75rem 1rem;
+            margin-bottom: 1rem;
+            background: rgba(88, 166, 255, 0.06);
+            border-radius: 0 var(--radius) var(--radius) 0;
+        }
+        blockquote p, .info-box p { margin-bottom: 0; }
+        .info-box.warn { border-left-color: var(--yellow); background: var(--yellow-bg); }
+        .info-box.err { border-left-color: var(--red); background: var(--red-bg); }
+        .info-box.good { border-left-color: var(--green); background: var(--green-bg); }
+
+        /* --- Badges --- */
+        .badge {
+            display: inline-block;
+            padding: 0.1rem 0.5rem;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .badge-green { background: var(--green-bg); color: var(--green); }
+        .badge-red { background: var(--red-bg); color: var(--red); }
+        .badge-blue { background: rgba(88, 166, 255, 0.15); color: var(--blue); }
+        .badge-yellow { background: var(--yellow-bg); color: var(--yellow); }
+
+        /* --- Step List --- */
+        .step-list {
+            list-style: none; padding: 0; counter-reset: step;
+        }
+        .step-list li {
+            counter-increment: step;
+            padding: 0.8rem 1rem 0.8rem 2.8rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            margin-bottom: 0.6rem;
+            position: relative;
+        }
+        .step-list li::before {
+            content: counter(step);
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 24px; height: 24px;
+            background: var(--accent);
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        /* --- Bottom Nav --- */
+        .bottom-nav {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-top: 2.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+        .bottom-nav a {
+            display: flex; align-items: center; gap: 0.4rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 0.88rem;
+            transition: border-color 0.2s;
+        }
+        .bottom-nav a:hover {
+            border-color: var(--accent);
+            text-decoration: none;
+        }
+        .bottom-nav .next { margin-left: auto; }
+
+        /* --- Responsive --- */
+        @media (max-width: 768px) {
+            :root { --sidebar-w: 260px; }
+            .topbar .hamburger { display: block; }
+            .topbar .topbar-right .tag { display: none; }
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); }
+            .main-content {
+                margin-left: 0;
+                padding: 1rem;
+            }
+            .main-content > header p { max-width: 100%; }
+            table { font-size: 0.8rem; }
+            table th, table td { padding: 0.35rem 0.5rem; }
+            pre { font-size: 0.76rem; padding: 0.8rem; }
+        }
+        @media (max-width: 480px) {
+            .main-content { padding: 0.75rem; }
+            .topbar { gap: 0.4rem; padding: 0 0.6rem; }
+            .topbar-back { padding: 4px 6px; }
+            .topbar-ui-link { padding: 2px 6px; }
+        }
+
+        /* --- Misc --- */
+        hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+        .tag-list { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        dl { margin-bottom: 1rem; }
+        dt { font-weight: 600; margin-top: 0.8rem; color: var(--text); }
+        dd { margin-left: 1rem; color: var(--text-muted); }
+        .endpoint {
+            display: inline-flex; align-items: center; gap: 0.4rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.2rem 0.5rem;
+            font-family: var(--mono);
+            font-size: 0.82rem;
+        }
+        .endpoint .method {
+            font-weight: 700;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+        }
+        .endpoint .method.get { color: var(--green); }
+        .endpoint .method.post { color: var(--blue); }
+        .endpoint .method.put { color: var(--yellow); }
+        .endpoint .method.del { color: var(--red); }
+    </style>
+</head>
+<body>
+
+<!-- ============ TOPBAR ============ -->
+<div class="topbar">
+    <button class="hamburger" onclick="toggleSidebar()" aria-label="Abrir menu">&#9776;</button>
+    <a href="/" class="topbar-back" title="Voltar para o Dashboard">&#8592; Dashboard</a>
+    <div class="logo">&#9673; <span>Payment Processor</span></div>
+    <div class="topbar-right">
+        <a href="/producer" class="topbar-ui-link">&#9998; Producer UI</a>
+        <span class="tag">Go 1.26</span>
+        <span class="tag">Kafka</span>
+        <span class="tag">Redis</span>
+        <span class="tag">DynamoDB</span>
+    </div>
+</div>
+
+<!-- ============ SIDEBAR OVERLAY ============ -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<!-- ============ SIDEBAR ============ -->
+<nav class="sidebar" id="sidebar">
+    <h3>Documentacao</h3>
+    <ul>
+        <li><a href="#descricao-geral" class="active"><span class="icon">&#9679;</span> Descricao Geral</a></li>
+        <li><a href="#features"><span class="icon">&#9733;</span> Features</a></li>
+        <li><a href="#arquitetura"><span class="icon">&#9641;</span> Arquitetura</a></li>
+        <li><a href="#fluxo-de-dados"><span class="icon">&#10140;</span> Fluxo de Dados</a></li>
+        <li><a href="#api-endpoints"><span class="icon">&#9881;</span> API Endpoints</a></li>
+        <li><a href="#producer-ui"><span class="icon">&#9998;</span> Producer UI</a></li>
+        <li><a href="#configuracao"><span class="icon">&#9881;</span> Configuracao</a></li>
+        <li><a href="#eventos"><span class="icon">&#9776;</span> Formatos de Evento</a></li>
+        <li><a href="#quick-start"><span class="icon">&#9654;</span> Quick Start</a></li>
+    </ul>
+    <hr style="margin: 0.75rem; border-color: var(--border);">
+    <h3>Navegacao</h3>
+    <ul>
+        <li><a href="/"><span class="icon">&#9673;</span> Dashboard</a></li>
+        <li><a href="/producer"><span class="icon">&#9998;</span> Producer UI</a></li>
+    </ul>
+</nav>
+
+<!-- ============ MAIN CONTENT ============ -->
+<div class="main-content">
+
+    <header>
+        <h1>Payment Processor</h1>
+        <p>Sistema distribuido de processamento de pagamentos em Go, baseado em microsservicos e mensageria assincrona via Kafka. Oferece pipeline completo de publicacao, consumo, validacao, persistencia e monitoramento em tempo real.</p>
+    </header>
+
+    <!-- ============ DESCRICAO GERAL ============ -->
+    <h2 id="descricao-geral">Descricao Geral</h2>
+
+    <p>O <strong>Payment Processor</strong> e um conjunto de servicos para processamento de eventos de pagamento em tempo real. A arquitetura segue o padrao <strong>Event-Driven</strong> com Kafka como espinha dorsal, Redis para estado e idempotencia, e DynamoDB para historico permanente.</p>
+
+    <p>O sistema oferece tres interfaces de interacao:</p>
+
+    <ul>
+        <li><strong>Producer UI</strong> (<code>/producer</code>) — Interface web para publicar eventos manualmente</li>
+        <li><strong>CLI Producer</strong> (<code>cmd/producer</code>) — Ferramenta de linha de comando para scripts e automacao</li>
+        <li><strong>Dashboard</strong> (<code>/</code>) — Monitoramento em tempo real com SSE, consultas e metricas</li>
+    </ul>
+
+    <div class="tag-list">
+        <span class="badge badge-green">Go 1.26</span>
+        <span class="badge badge-blue">Kafka</span>
+        <span class="badge badge-blue">Redis</span>
+        <span class="badge badge-yellow">DynamoDB</span>
+        <span class="badge badge-blue">OpenTelemetry</span>
+        <span class="badge badge-green">Docker</span>
+    </div>
+
+    <!-- ============ FEATURES ============ -->
+    <h2 id="features">Features</h2>
+
+    <div class="feature-grid">
+        <div class="feature-card">
+            <div class="card-icon">&#9889;</div>
+            <h4>Kafka Consumer</h4>
+            <p>Consome eventos do Kafka, valida payload, gerencia idempotencia via Redis, persiste em Redis/DynamoDB e aplica retry com Dead Letter Queue.</p>
+            <a href="features/payment-consumer.html">Ver detalhes &rarr;</a>
+        </div>
+        <div class="feature-card">
+            <div class="card-icon">&#128187;</div>
+            <h4>Dashboard (Payment UI)</h4>
+            <p>Interface web para monitoramento em tempo real com SSE, consulta de pagamentos, historico completo no DynamoDB e metricas agregadas.</p>
+            <a href="features/payment-ui.html">Ver detalhes &rarr;</a>
+        </div>
+        <div class="feature-card">
+            <div class="card-icon">&#128295;</div>
+            <h4>CLI Producer</h4>
+            <p>Ferramenta de linha de comando para publicar eventos no Kafka. Suporta multi-plas fontes de dados, dry-run, bulk mode com rate limiting.</p>
+            <a href="features/cli-producer.html">Ver detalhes &rarr;</a>
+        </div>
+        <div class="feature-card">
+            <div class="card-icon">&#9998;</div>
+            <h4>Producer UI</h4>
+            <p>Interface web para publicar eventos de pagamento diretamente do navegador. Formulario com preview JSON, publicacao em lote e historico de sessao.</p>
+            <a href="producer-guide.html">Ver guia &rarr;</a>
+        </div>
+    </div>
+
+    <!-- ============ ARQUITETURA ============ -->
+    <h2 id="arquitetura">Arquitetura</h2>
+
+    <h3>Diagrama de Componentes</h3>
+
+    <pre>
+┌──────────────────────────────────────────────────────────────────────────┐
+│                          Docker Network                                  │
+│                                                                          │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐               │
+│  │   Producer   │    │  Consumer    │    │     UI       │               │
+│  │ (CLI / once) │───▶│ (always-on)  │◀───│ (always-on)  │               │
+│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘               │
+│         │                   │                    │                        │
+│         │  publish          │                    │                        │
+│         ▼                   │                    │                        │
+│  ┌──────────────┐           │              ┌─────┴──────┐               │
+│  │    Kafka     │◀──────────│──────────────│  Redis     │               │
+│  │ payment.events│          │ Pub/Sub      │  (status,  │               │
+│  │ payment.events│──────────│──────────────│ idempot.,  │               │
+│  │    .dlq       │           │              │  events)   │               │
+│  └──────────────┘           │              └────────────┘               │
+│         │                   │                                            │
+│         │  DLQ publish      │  RecordHistory                             │
+│         ▼                   ▼                                            │
+│  ┌─────────────────────────────────────────┐                            │
+│  │              DynamoDB (Floci)            │                            │
+│  │         ┌──────────────────────┐        │                            │
+│  │         │  payment_history     │        │                            │
+│  │         │  PK: payment_id      │        │                            │
+│  │         │  SK: timestamp       │        │                            │
+│  │         └──────────────────────┘        │                            │
+│  └─────────────────────────────────────────┘                            │
+│                                                                          │
+│  ┌─────────────────────────────────────────┐                            │
+│  │        OpenTelemetry Collector          │                            │
+│  │  OTLP gRPC:4317 / OTLP HTTP:4318        │                            │
+│  └─────────────────────────────────────────┘                            │
+└──────────────────────────────────────────────────────────────────────────┘
+    </pre>
+
+    <p>A <strong>Producer UI</strong> se integra a este diagrama como uma pagina web servida pelo proprio servidor <code>cmd/ui</code> na porta 8081, publicando eventos diretamente no Kafka e no Redis Pub/Sub.</p>
+
+    <h3>Fluxo da Producer UI</h3>
+
+    <pre>
+Browser (Producer UI)
+    │
+    │ POST /api/publish  (JSON PaymentEvent)
+    ▼
+Go HTTP Server (:8081)
+    │
+    ├── 1. Valida payload (tamanho, formato, campos)
+    ├── 2. Publica no Kafka (topic: payment.events)
+    │       └── Headers: source=ui-producer, timestamp
+    ├── 3. Publica no Redis Pub/Sub (canal: payment:events)
+    │       └── EventBus distribui para SSE clients
+    └── 4. Retorna 200 + resultado (partition, offset)
+    </pre>
+
+    <!-- ============ FLUXO DE DADOS ============ -->
+    <h2 id="fluxo-de-dados">Fluxo de Dados</h2>
+
+    <h3>Fluxo Completo (Producer UI ate Dashboard)</h3>
+
+    <ol>
+        <li><strong>Usuario preenche formulario</strong> na Producer UI em <code>/producer</code></li>
+        <li><strong>Frontend valida</strong> os campos (UUID, amount > 0, currency 3 letras)</li>
+        <li><strong>Frontend envia POST</strong> <code>/api/publish</code> com JSON do evento</li>
+        <li><strong>Backend valida</strong> novamente (limite de 64KB, Content-Type, campos)</li>
+        <li><strong>Backend publica</strong> no Kafka via <code>sarama.SyncProducer.SendMessage()</code></li>
+        <li><strong>Backend publica</strong> no EventBus (Redis Pub/Sub) para feed SSE</li>
+        <li><strong>Backend retorna</strong> <code>{status, payment_id, partition, offset}</code></li>
+        <li><strong>Frontend exibe</strong> toast de sucesso e adiciona linha na tabela de historico</li>
+        <li><strong>Consumer processa</strong> o evento: valida, persiste status+historico</li>
+        <li><strong>Dashboard</strong> recebe o evento via SSE e atualiza em tempo real</li>
+    </ol>
+
+    <div class="info-box good">
+        <strong>Nota:</strong> A publicacao no EventBus (Redis Pub/Sub) e feita apos o Kafka, em carater best-effort. Se o Redis estiver indisponivel, o evento ainda sera publicado no Kafka e processado pelo consumer — porem, nao aparecera no feed SSE em tempo real.
+    </div>
+
+    <!-- ============ API ENDPOINTS ============ -->
+    <h2 id="api-endpoints">API Endpoints</h2>
+
+    <p>Todas as rotas expostas pelo servidor <code>cmd/ui</code> na porta 8081:</p>
+
+    <h3>Dashboard e Arquivos Estaticos</h3>
+
+    <table>
+        <thead>
+            <tr><th>Metodo</th><th>Rota</th><th>Descricao</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="endpoint"><span class="method get">GET</span></span></td>
+                <td><code>/</code></td>
+                <td>Pagina inicial (Dashboard) — servida de <code>static/index.html</code></td>
+            </tr>
+            <tr>
+                <td><span class="endpoint"><span class="method get">GET</span></span></td>
+                <td><code>/producer</code></td>
+                <td>Pagina da Producer UI — servida de <code>static/producer.html</code></td>
+            </tr>
+            <tr>
+                <td><span class="endpoint"><span class="method get">GET</span></span></td>
+                <td><code>/static/*</code></td>
+                <td>Arquivos estaticos (CSS, JS, imagens)</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>API de Dados (Dashboard)</h3>
+
+    <table>
+        <thead>
+            <tr><th>Metodo</th><th>Rota</th><th>Descricao</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="endpoint"><span class="method get">GET</span></span></td>
+                <td><code>/api/events</code></td>
+                <td>Stream SSE de eventos em tempo real. Heartbeat a cada 30s. Conexao limitada a 100 simultaneas.</td>
+            </tr>
+            <tr>
+                <td><span class="endpoint"><span class="method get">GET</span></span></td>
+                <td><code>/api/payments</code></td>
+                <td>Lista pagamentos do Redis. Filtros opcionais: <code>?payment_id=</code> (LIKE), <code>?status=</code> (exato). Timeout: 5s.</td>
+            </tr>
+            <tr>
+                <td><span class="endpoint"><span class="method get">GET</span></span></td>
+                <td><code>/api/payments/{id}/history</code></td>
+                <td>Historico completo de um pagamento no DynamoDB. Ordenado por timestamp ascendente. Timeout: 10s.</td>
+            </tr>
+            <tr>
+                <td><span class="endpoint"><span class="method get">GET</span></span></td>
+                <td><code>/api/metrics</code></td>
+                <td>Metricas agregadas: total_processed, by_status, success_rate, dlq_count. Timeout: 5s.</td>
+            </tr>
+            <tr>
+                <td><span class="endpoint"><span class="method get">GET</span></span></td>
+                <td><code>/healthz</code></td>
+                <td>Health check: ping no Redis. Retorna 200 se ok, 503 se Redis down.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>API de Publicacao (Producer UI)</h3>
+
+    <table>
+        <thead>
+            <tr><th>Metodo</th><th>Rota</th><th>Descricao</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="endpoint"><span class="method post">POST</span></span></td>
+                <td><code>/api/publish</code></td>
+                <td>
+                    Publica um evento de pagamento no Kafka e no EventBus.
+                    Payload maximo: 64KB. Timeout: 10s.<br>
+                    <strong>Content-Type:</strong> <code>application/json</code><br>
+                    <strong>Retorno:</strong> <code>{status, payment_id, partition, offset}</code>
+                </td>
+            </tr>
+            <tr>
+                <td><span class="endpoint"><span class="method post">POST</span></span></td>
+                <td><code>/api/publish/bulk</code></td>
+                <td>
+                    Gera e publica N eventos aleatorios (1 a 100, default 10).
+                    Payload: <code>{"count": N}</code>. Timeout total: 30s.<br>
+                    <strong>Retorno:</strong> Array de resultados com partition/offset ou erro por item.
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h4>POST /api/publish — Exemplo</h4>
+
+    <pre>
+<span class="copy-btn" onclick="copyCode(this)">Copiar</span><code>POST /api/publish
+Content-Type: application/json
+
+{
+  "payment_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "status": "confirmed",
+  "amount": 150.00,
+  "currency": "BRL",
+  "description": "Pedido #12345"
+}
+
+Resposta 200:
+{
+  "status": "published",
+  "payment_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "partition": 0,
+  "offset": 42
+}</code></pre>
+
+    <h4>POST /api/publish/bulk — Exemplo</h4>
+
+    <pre>
+<span class="copy-btn" onclick="copyCode(this)">Copiar</span><code>POST /api/publish/bulk
+Content-Type: application/json
+
+{ "count": 3 }
+
+Resposta 200:
+[
+  {"payment_id": "uuid-1", "status": "confirmed", "partition": 0, "offset": 43},
+  {"payment_id": "uuid-2", "status": "failed", "partition": 1, "offset": 12},
+  {"payment_id": "uuid-3", "status": "confirmed", "partition": 0, "offset": 44}
+]</code></pre>
+
+    <h4>Codigos de Erro</h4>
+
+    <table>
+        <thead>
+            <tr><th>Status</th><th>Significado</th><th>Causa</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>400</code></td><td>Bad Request</td><td>JSON mal formado, amount <= 0, currency invalida, description > 255, UUID invalido, count fora do intervalo</td></tr>
+            <tr><td><code>413</code></td><td>Request Entity Too Large</td><td>Payload maior que 64KB (publish) ou 4KB (bulk)</td></tr>
+            <tr><td><code>415</code></td><td>Unsupported Media Type</td><td>Content-Type diferente de <code>application/json</code></td></tr>
+            <tr><td><code>502</code></td><td>Bad Gateway</td><td>Kafka indisponivel</td></tr>
+        </tbody>
+    </table>
+
+    <!-- ============ PRODUCER UI ============ -->
+    <h2 id="producer-ui">Producer UI</h2>
+
+    <p>A <strong>Producer UI</strong> e uma interface web para publicar eventos de pagamento no Kafka diretamente do navegador. Acessivel em <a href="http://localhost:8081/producer" target="_blank">http://localhost:8081/producer</a>.</p>
+
+    <div class="info-box">
+        <strong>Dica:</strong> Para um guia detalhado de uso da Producer UI, veja o <a href="producer-guide.html">Guia da Producer UI</a>.
+    </div>
+
+    <h3>Tecnologias</h3>
+    <ul>
+        <li><strong>HTML5</strong> — Estrutura semantica</li>
+        <li><strong>CSS3</strong> — Dark theme, responsivo, reutiliza <code>style.css</code> da dashboard</li>
+        <li><strong>JavaScript Vanilla</strong> — Zero frameworks, zero dependencias</li>
+        <li><strong>Embed.FS</strong> — Assets embutidos no binario Go</li>
+    </ul>
+
+    <h3>Funcionalidades</h3>
+
+    <table>
+        <thead>
+            <tr><th>Funcionalidade</th><th>Descricao</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><strong>Formulario de publicacao</strong></td><td>Campos: Payment ID (UUID, auto-gerado), Status (select), Amount, Currency, Description</td></tr>
+            <tr><td><strong>Preview JSON ao vivo</strong></td><td>Pre-visualizacao do payload JSON atualizada em tempo real conforme o usuario digita</td></tr>
+            <tr><td><strong>Publicacao unica</strong></td><td>Envia POST /api/publish com validacao frontend antes do envio</td></tr>
+            <tr><td><strong>Publicacao em lote</strong></td><td>Gera e publica 10 eventos aleatorios com um clique</td></tr>
+            <tr><td><strong>Historico de sessao</strong></td><td>Tabela com ate 50 ultimas publicacoes, persistida em sessionStorage</td></tr>
+            <tr><td><strong>Toasts de feedback</strong></td><td>Notificacoes visuais de sucesso (verde), erro (vermelho) e aviso (amarelo)</td></tr>
+            <tr><td><strong>Detalhes do Kafka</strong></td><td>Particao e offset retornados apos cada publicacao bem-sucedida</td></tr>
+            <tr><td><strong>Atalho de teclado</strong></td><td>Ctrl+Enter para publicar rapidamente</td></tr>
+        </tbody>
+    </table>
+
+    <h3>Estrutura de Arquivos</h3>
+
+    <table>
+        <thead>
+            <tr><th>Arquivo</th><th>Descricao</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>internal/ui/handlers.go</code></td><td>Handlers <code>HandlePublish</code> e <code>HandlePublishBulk</code></td></tr>
+            <tr><td><code>internal/ui/server.go</code></td><td>Rotas <code>POST /api/publish</code>, <code>POST /api/publish/bulk</code>, <code>GET /producer</code></td></tr>
+            <tr><td><code>cmd/ui/main.go</code></td><td>Criacao do <code>sarama.SyncProducer</code>, graceful shutdown com <code>Close()</code></td></tr>
+            <tr><td><code>internal/ui/static/producer.html</code></td><td>Pagina HTML da Producer UI</td></tr>
+            <tr><td><code>internal/ui/static/producer.js</code></td><td>Logica JavaScript (validacao, fetch, preview, toasts, historico)</td></tr>
+        </tbody>
+    </table>
+
+    <h3>Tratamento de Erros</h3>
+
+    <table>
+        <thead>
+            <tr><th>Cenario</th><th>Resposta Backend</th><th>Feedback Frontend</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Kafka indisponivel</td><td>502 — <code>kafka error: ...</code></td><td>Toast vermelho "Falha ao publicar: kafka not available"</td></tr>
+            <tr><td>Payload invalido</td><td>400 — <code>invalid JSON body</code></td><td>Toast vermelho com detalhe do erro</td></tr>
+            <tr><td>Publicacao bem-sucedida</td><td>200 — <code>{status, partition, offset}</code></td><td>Toast verde + linha na tabela de historico</td></tr>
+            <tr><td>Erro parcial no bulk</td><td>200 — array com erros por item</td><td>Toast amarelo com resumo (ex: "9 sucesso(s), 1 falha(s)")</td></tr>
+        </tbody>
+    </table>
+
+    <!-- ============ CONFIGURACAO ============ -->
+    <h2 id="configuracao">Configuracao</h2>
+
+    <p>Todas as configuracoes sao carregadas via <strong>Viper</strong>, com suporte a variaveis de ambiente e arquivo <code>config.yaml</code>.</p>
+
+    <h3>Variaveis de Ambiente</h3>
+
+    <table>
+        <thead>
+            <tr><th>Variavel</th><th>Default</th><th>Servicos</th><th>Descricao</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>KAFKA_BROKERS</code></td><td><code>localhost:9092</code></td><td>consumer, ui, producer</td><td>Enderecos dos brokers Kafka (separados por virgula)</td></tr>
+            <tr><td><code>KAFKA_TOPIC</code></td><td><code>payment.events</code></td><td>consumer, ui, producer</td><td>Topico principal de eventos de pagamento</td></tr>
+            <tr><td><code>KAFKA_DLQ_TOPIC</code></td><td><code>payment.events.dlq</code></td><td>consumer</td><td>Topico Dead Letter Queue</td></tr>
+            <tr><td><code>KAFKA_CONSUMER_GROUP</code></td><td><code>payment-consumer-group</code></td><td>consumer</td><td>ID do grupo de consumo</td></tr>
+            <tr><td><code>REDIS_ADDR</code></td><td><code>localhost:6379</code></td><td>consumer, ui</td><td>Endereco do Redis</td></tr>
+            <tr><td><code>REDIS_PASSWORD</code></td><td><code></code> (vazio)</td><td>consumer, ui</td><td>Senha do Redis</td></tr>
+            <tr><td><code>DYNAMODB_ENDPOINT</code></td><td><code>http://localhost:4566</code></td><td>consumer, ui</td><td>Endpoint do DynamoDB (local ou AWS)</td></tr>
+            <tr><td><code>DYNAMODB_TABLE</code></td><td><code>payment_history</code></td><td>consumer, ui</td><td>Nome da tabela de historico</td></tr>
+            <tr><td><code>UI_PORT</code></td><td><code>8081</code></td><td>ui</td><td>Porta do servidor HTTP da UI</td></tr>
+            <tr><td><code>UI_EVENT_BUS_BUFFER</code></td><td><code>256</code></td><td>ui</td><td>Tamanho do buffer do EventBus</td></tr>
+            <tr><td><code>UI_READ_TIMEOUT</code></td><td><code>10s</code></td><td>ui</td><td>Timeout de leitura HTTP</td></tr>
+            <tr><td><code>UI_WRITE_TIMEOUT</code></td><td><code>30s</code></td><td>ui</td><td>Timeout de escrita HTTP</td></tr>
+            <tr><td><code>WORKER_COUNT</code></td><td><code>10</code></td><td>consumer</td><td>Numero de workers concorrentes</td></tr>
+            <tr><td><code>IDEMPOTENCY_TTL_HOURS</code></td><td><code>24</code></td><td>consumer</td><td>TTL da chave de idempotencia (horas)</td></tr>
+            <tr><td><code>STATUS_TTL_HOURS</code></td><td><code>168</code></td><td>consumer</td><td>TTL do status do pagamento (horas)</td></tr>
+            <tr><td><code>RETRY_MAX_ATTEMPTS</code></td><td><code>3</code></td><td>consumer</td><td>Maximo de tentativas de retry</td></tr>
+            <tr><td><code>RETRY_BASE_DELAY_MS</code></td><td><code>100</code></td><td>consumer</td><td>Delay base do retry (ms)</td></tr>
+            <tr><td><code>OTEL_EXPORTER_OTLP_ENDPOINT</code></td><td><code>localhost:4317</code></td><td>consumer</td><td>Endpoint OTLP gRPC</td></tr>
+            <tr><td><code>OTEL_SERVICE_NAME</code></td><td><code>payment-consumer</code></td><td>consumer</td><td>Nome do servico para telemetria</td></tr>
+            <tr><td><code>GRACEFUL_SHUTDOWN_TIMEOUT</code></td><td><code>30s</code></td><td>consumer, ui</td><td>Timeout do shutdown gracioso</td></tr>
+        </tbody>
+    </table>
+
+    <h3>Configuracao Docker</h3>
+
+    <p>Para utilizar a Producer UI com Docker, o servico <code>payment-ui</code> no <code>docker-compose.yml</code> deve incluir:</p>
+
+    <pre>
+<span class="copy-btn" onclick="copyCode(this)">Copiar</span><code>payment-ui:
+  environment:
+    - KAFKA_BROKERS=kafka:9092
+    - KAFKA_TOPIC=payment.events
+    - REDIS_ADDR=redis:6379
+    - DYNAMODB_ENDPOINT=http://floci:4566
+    - DYNAMODB_TABLE=payment_history
+    - UI_PORT=8081</code></pre>
+
+    <!-- ============ FORMATOS DE EVENTO ============ -->
+    <h2 id="eventos">Formatos de Evento</h2>
+
+    <h3>PaymentEvent (Kafka)</h3>
+
+    <pre>
+<span class="copy-btn" onclick="copyCode(this)">Copiar</span><code>{
+  "payment_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",  // UUID v4, obrigatorio
+  "status": "confirmed",                                    // pending|confirmed|failed|refunded
+  "amount": 150.00,                                         // float64, > 0
+  "currency": "BRL",                                        // ISO 4217, 3 letras
+  "description": "Pedido #12345",                           // opcional, max 255 chars
+  "timestamp": "2026-05-25T12:00:00Z"                      // RFC 3339, auto-preenchido
+}</code></pre>
+
+    <h3>PaymentStatus (Redis)</h3>
+
+    <pre><code>Redis Hash "payment:&lt;payment_id&gt;"
+  HSET payment:&lt;payment_id&gt; payment_id "uuid" status "confirmed" updated_at "2026-05-25T12:00:00Z"
+  TTL: 168 horas (7 dias)</code></pre>
+
+    <h3>PaymentHistory (DynamoDB)</h3>
+
+    <pre><code>Table: payment_history
+  PK: payment_id  (String, Hash Key)
+  SK: timestamp   (String, Range Key)
+  Attributes: status, amount, currency, description, processed_at, trace_id
+  Billing: PAY_PER_REQUEST</code></pre>
+
+    <h3>SSE Event Stream</h3>
+
+    <pre><code>event: payment
+data: {"payment_id":"...","status":"confirmed","amount":100,"currency":"BRL","timestamp":"..."}
+
+event: heartbeat
+data: {}</code></pre>
+
+    <!-- ============ QUICK START ============ -->
+    <h2 id="quick-start">Quick Start</h2>
+
+    <h3>Subir infraestrutura</h3>
+
+    <pre>
+<span class="copy-btn" onclick="copyCode(this)">Copiar</span><code># Subir todos os servicos
+docker-compose up -d
+
+# Ou apenas a infraestrutura minima
+docker-compose up -d kafka redis floci otel-collector</code></pre>
+
+    <h3>Executar UI (com Producer)</h3>
+
+    <pre>
+<span class="copy-btn" onclick="copyCode(this)">Copiar</span><code># A UI inclui suporte a Kafka para publicacao
+go run ./cmd/ui
+
+# Acessar:
+#   Dashboard: http://localhost:8081/
+#   Producer:  http://localhost:8081/producer</code></pre>
+
+    <h3>Executar Consumer</h3>
+
+    <pre>
+<span class="copy-btn" onclick="copyCode(this)">Copiar</span><code>go run ./cmd/consumer</code></pre>
+
+    <h3>Publicar evento via CLI</h3>
+
+    <pre>
+<span class="copy-btn" onclick="copyCode(this)">Copiar</span><code>go run ./cmd/producer publish \
+  --status confirmed \
+  --amount 150.00 \
+  --currency BRL \
+  --description "Pedido #12345"</code></pre>
+
+    <h3>Comandos Makefile</h3>
+
+    <table>
+        <thead>
+            <tr><th>Comando</th><th>Descricao</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>make test</code></td><td>Executa todos os testes com race detector</td></tr>
+            <tr><td><code>make build-ui</code></td><td>Compila a UI</td></tr>
+            <tr><td><code>make run-ui</code></td><td>Executa a UI</td></tr>
+            <tr><td><code>make docker-up</code></td><td>Sobe todos os servicos Docker</td></tr>
+            <tr><td><code>make docker-down</code></td><td>Derruba todos os servicos Docker</td></tr>
+        </tbody>
+    </table>
+
+    <!-- ============ FOOTER / NAV ============ -->
+    <div class="bottom-nav">
+        <a href="producer-guide.html">&#8592; Guia da Producer UI</a>
+        <a href="features/payment-consumer.html" class="next">Payment Consumer &#8594;</a>
+    </div>
+
+</div>
+
+<script>
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('sidebarOverlay').classList.toggle('open');
+}
+function copyCode(btn) {
+    var pre = btn.parentElement;
+    var text = pre.querySelector('code') ? pre.querySelector('code').textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+        btn.textContent = 'Copiado!';
+        btn.classList.add('copied');
+        setTimeout(function () {
+            btn.textContent = 'Copiar';
+            btn.classList.remove('copied');
+        }, 2000);
+    });
+}
+// Highlight current section in sidebar
+document.addEventListener('DOMContentLoaded', function () {
+    var links = document.querySelectorAll('.sidebar a');
+    var sections = [];
+    links.forEach(function (link) {
+        var href = link.getAttribute('href');
+        if (href && href.startsWith('#')) {
+            sections.push({
+                el: document.getElementById(href.slice(1)),
+                link: link
+            });
+        }
+    });
+    function onScroll() {
+        var scrollY = window.scrollY + 80;
+        var current = null;
+        sections.forEach(function (s) {
+            if (s.el && s.el.offsetTop <= scrollY) {
+                current = s;
+            }
+        });
+        links.forEach(function (l) { l.classList.remove('active'); });
+        if (current) current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', onScroll);
+    onScroll();
+});
+</script>
+
+</body>
+</html>
