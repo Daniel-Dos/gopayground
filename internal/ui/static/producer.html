@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Producer de Pagamentos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>⬡</text></svg>">
+</head>
+<body>
+    <div class="producer-page">
+
+        <!-- ============ HEADER ============ -->
+        <header>
+            <div class="header-brand">
+                <span class="brand-icon">⬡</span>
+                <div class="brand-text">
+                    <h1>Producer de Pagamentos</h1>
+                    <span class="brand-subtitle">Publicação Manual de Eventos Kafka</span>
+                </div>
+            </div>
+            <nav class="header-nav">
+                <a href="/" class="nav-link">📋 Dashboard</a>
+                <a href="/producer" class="nav-link active">📝 Producer</a>
+                <a href="/dashboard" class="nav-link">📊 Gráficos</a>
+                <a href="/docs/index.html" class="nav-link">📚 Documentação</a>
+            </nav>
+        </header>
+
+        <!-- ============ TOAST CONTAINER ============ -->
+        <div id="toast-container" aria-live="polite"></div>
+
+        <!-- ============ MAIN LAYOUT ============ -->
+        <div class="producer-layout">
+
+            <!-- ============ PUBLISH FORM ============ -->
+            <section class="producer-section form-section">
+                <div class="section-head">
+                    <span class="section-head-accent"></span>
+                    <h2>Publicar Evento</h2>
+                </div>
+
+                <form id="publish-form" class="form-grid" autocomplete="off">
+
+                    <div class="form-field">
+                        <label for="payment-id" class="form-label">ID do Pagamento</label>
+                        <input type="text" id="payment-id" class="form-input font-mono"
+                               placeholder="Auto-gerado se vazio">
+                    </div>
+
+                    <div class="form-field">
+                        <label for="status" class="form-label">Situação</label>
+                        <select id="status" class="form-select">
+                            <option value="pending">Pendente</option>
+                            <option value="confirmed" selected>Confirmado</option>
+                            <option value="failed">Falhou</option>
+                            <option value="refunded">Reembolsado</option>
+                        </select>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="amount" class="form-label">Valor</label>
+                        <input type="number" id="amount" class="form-input"
+                               placeholder="Ex: 150.00" step="0.01" min="0.01" required>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="currency" class="form-label">Moeda</label>
+                        <input type="text" id="currency" class="form-input font-mono"
+                               placeholder="BRL" value="BRL" maxlength="3" required>
+                    </div>
+
+                    <div class="form-field form-field-wide">
+                        <label for="description" class="form-label">Descrição</label>
+                        <input type="text" id="description" class="form-input"
+                               placeholder="Descrição do pagamento (opcional)" maxlength="255">
+                    </div>
+
+                </form>
+
+                <!-- ============ ACTIONS ============ -->
+                <div class="form-actions">
+                    <button type="button" id="btn-publish" class="btn btn-primary">
+                        <span class="btn-icon">&#9654;</span>
+                        Publicar
+                    </button>
+                    <button type="button" id="btn-publish-bulk" class="btn btn-secondary">
+                        <span class="btn-icon">&#9851;</span>
+                        Publicar 10 Aleatórios
+                    </button>
+                </div>
+            </section>
+
+            <!-- ============ JSON PREVIEW ============ -->
+            <section class="producer-section preview-section">
+                <div class="section-head">
+                    <span class="section-head-accent"></span>
+                    <h2>Preview</h2>
+                </div>
+                <div class="preview-box" id="preview-box">
+                    <pre id="preview-json" class="preview-json"><code>{
+  <span class="preview-key">"payment_id"</span>: <span class="preview-string">"&lt;auto-gerado&gt;"</span>,
+  <span class="preview-key">"status"</span>: <span class="preview-string">"confirmed"</span>,
+  <span class="preview-key">"amount"</span>: <span class="preview-number">0.00</span>,
+  <span class="preview-key">"currency"</span>: <span class="preview-string">"BRL"</span>,
+  <span class="preview-key">"description"</span>: <span class="preview-string">""</span>,
+  <span class="preview-key">"timestamp"</span>: <span class="preview-string">"2026-05-25T00:00:00Z"</span>
+}</code></pre>
+                </div>
+            </section>
+
+        </div>
+
+        <!-- ============ RECENT PUBLICATIONS ============ -->
+        <section class="producer-section results-section">
+            <div class="section-head">
+                <span class="section-head-accent"></span>
+                <h2>Últimas Publicações</h2>
+                <button type="button" id="btn-clear-history" class="btn-clear">Limpar Histórico</button>
+            </div>
+            <div class="section-card">
+                <div class="table-wrap">
+                    <table id="results-table" class="results-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Situação</th>
+                                <th>Valor</th>
+                                <th>Partição</th>
+                                <th>Offset</th>
+                                <th>Data/Hora</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-tbody">
+                            <tr>
+                                <td colspan="6" class="empty-cell">Nenhuma publicação ainda.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <script src="producer.js"></script>
+</body>
+</html>
