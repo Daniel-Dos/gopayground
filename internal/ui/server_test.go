@@ -31,14 +31,14 @@ func newTestServer(t *testing.T) (*ui.Server, *miniredis.Miniredis) {
 	logger := slog.New(slog.NewTextHandler(discardWriter{}, nil))
 
 	cfg := config.NewConfig()
-	cfg.UIPort = "0"
-	cfg.UIEventBusBuffer = 64
-	cfg.UIReadTimeout = 10 * time.Second
-	cfg.UIWriteTimeout = 30 * time.Second
-	cfg.RedisAddr = mr.Addr()
+	cfg.UI.Port = "0"
+	cfg.UI.EventBusBuffer = 64
+	cfg.UI.ReadTimeout = 10 * time.Second
+	cfg.UI.WriteTimeout = 30 * time.Second
+	cfg.Redis.Addr = mr.Addr()
 
 	meter := otel.Meter("test")
-	server := ui.NewServer(cfg, client, &dynamodb.Client{}, nil, logger, meter)
+	server := ui.NewServer(cfg, client, &dynamodb.Client{}, logger, meter)
 	return server, mr
 }
 

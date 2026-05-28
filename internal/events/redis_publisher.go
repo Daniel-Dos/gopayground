@@ -10,18 +10,18 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// RedisPublisher publishes events to a Redis Pub/Sub channel.
+// RedisPublisher publica eventos em um canal Redis Pub/Sub.
 type RedisPublisher struct {
 	client  *redis.Client
 	channel string
 }
 
-// NewRedisPublisher creates a new RedisPublisher.
+// NewRedisPublisher cria um novo RedisPublisher.
 func NewRedisPublisher(client *redis.Client, channel string) *RedisPublisher {
 	return &RedisPublisher{client: client, channel: channel}
 }
 
-// Publish marshals the event and publishes it to the configured Redis channel.
+// Publish serializa o evento e publica no canal Redis configurado.
 func (p *RedisPublisher) Publish(ctx context.Context, event *models.PaymentEvent) error {
 	data, err := json.Marshal(event)
 	if err != nil {

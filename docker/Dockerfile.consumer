@@ -17,6 +17,7 @@ RUN apk add --no-cache ca-certificates && \
 WORKDIR /app
 
 COPY --from=builder /app/consumer .
+COPY config.yaml .
 
 USER 65532
 

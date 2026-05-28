@@ -3,78 +3,96 @@
 ## Visão Geral da Arquitetura
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              Browser (Cliente)                              │
-│                                                                             │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │                          Producer UI (producer.html)                    │  │
-│  │                                                                         │  │
-│  │  ┌──────────────────────────────────────┐  ┌────────────────────────┐  │  │
-│  │  │         Formulário                    │  │  Preview JSON          │  │  │
-│  │  │  ┌────────────────────────────────┐  │  │  {                     │  │  │
-│  │  │  │ Payment ID: [uuid...        ]  │  │  │   "payment_id": "...", │  │  │
-│  │  │  │ Status:     [confirmed     ▼]  │  │  │   "status": "conf...", │  │  │
-│  │  │  │ Amount:     [150.00         ]  │  │  │   "amount": 150.00,    │  │  │
-│  │  │  │ Currency:   [BRL            ]  │  │  │   "currency": "BRL",   │  │  │
-│  │  │  │ Description:[Pedido #123    ]  │  │  │   ...                  │  │  │
-│  │  │  │ Timestamp:  [2026-05-25...  ]  │  │  │   }                    │  │  │
-│  │  │  └────────────────────────────────┘  │  └────────────────────────┘  │  │
-│  │  │                                                                     │  │
-│  │  │  [📤 Publicar]  [🎲 Publicar 10 Aleatórios]                       │  │
-│  │  └──────────────────────────────────────────────────────────────────────┘  │
-│  │                                                                             │
-│  │  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │  │  Últimas Publicações (sessão)                                        │  │
-│  │  │  ┌──────┬──────────┬────────┬──────────┬────────────────┬─────────┐ │  │
-│  │  │  │  ID  │ Status   │ Amount │ Currency │ Timestamp      │ Result  │ │  │
-│  │  │  ├──────┼──────────┼────────┼──────────┼────────────────┼─────────┤ │  │
-│  │  │  │ abc… │ ✅ Conf. │ 150.00 │ BRL      │ 2026-05-25…    │ ✓ p:0   │ │  │
-│  │  │  │ def… │ ❌ Falha │ 200.00 │ USD      │ 2026-05-25…    │ ✗ erro  │ │  │
-│  │  │  └──────┴──────────┴────────┴──────────┴────────────────┴─────────┘ │  │
-│  │  └──────────────────────────────────────────────────────────────────────┘  │
-│  │                                                                             │
-│  │  ┌──────────────────────────────────────────┐                              │
-│  │  │  [🏠 Dashboard] [📝 Producer] [📖 Docs] │ ← Navegação                  │
-│  │  └──────────────────────────────────────────┘                              │
-│  └─────────────────────────────────┬─────────────────────────────────────────┘
-│                                    │
-│           ┌────────────────────────┼────────────────────────────┐
-│           │ GET /producer          │ POST /api/publish          │
-│           │ (static HTML)          │ (JSON PaymentEvent)        │
-│           ▼                        ▼                            │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────────┐│
-│  │                  Go HTTP Server (:8081)                      ││
-│  │                                                              ││
-│  │  ┌──────────────────┐  ┌──────────────────┐  ┌────────────┐ ││
-│  │  │ Static File      │  │ HandlePublish    │  │ Handlers   │ ││
-│  │  │ Server           │  │ POST /api/publish│  │ existentes │ ││
-│  │  │ (index.html,     │  │                  │  │ (SSE,      │ ││
-│  │  │  producer.html,  │  │ 1. Validar       │  │  payments, │ ││
-│  │  │  app.js,         │  │ 2. Publicar Kafka│  │  metrics,  │ ││
-│  │  │  style.css)      │  │ 3. Publicar Redis│  │  etc.)     │ ││
-│  │  │                  │  │ 4. Retornar 200  │  │            │ ││
-│  │  └──────────────────┘  └────────┬─────────┘  └────────────┘ ││
-│  │                                 │                            ││
-│  │                    ┌────────────┴────────────┐               ││
-│  │                    │   EventBus (Redis Pub/  │               ││
-│  │                    │   Sub: payment:events)  │               ││
-│  │                    └────────────┬────────────┘               ││
-│  │                                 │                            ││
-│  └─────────────────────────────────┼────────────────────────────┘│
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                              Browser (Cliente)                               │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │                          Producer UI (producer.html)                     │  │
+│  │                                                                          │  │
+│  │  ┌───────────────────────────────────────┐  ┌────────────────────────┐  │  │
+│  │  │         Formulário                     │  │  Preview JSON          │  │  │
+│  │  │  ┌─────────────────────────────────┐  │  │  {                     │  │  │
+│  │  │  │ Payment ID: [uuid...         ]  │  │  │   "payment_id": "...", │  │  │
+│  │  │  │ Status:     [confirmed      ▼]  │  │  │   "status": "conf...", │  │  │
+│  │  │  │ Amount:     [150.00          ]  │  │  │   "amount": 150.00,    │  │  │
+│  │  │  │ Currency:   [BRL             ]  │  │  │   "currency": "BRL",   │  │  │
+│  │  │  │ Description:[Pedido #123     ]  │  │  │   ...                  │  │  │
+│  │  │  │ Timestamp:  [2026-05-25...   ]  │  │  │   }                    │  │  │
+│  │  │  └─────────────────────────────────┘  │  └────────────────────────┘  │  │
+│  │  │                                                                      │  │
+│  │  │  [📤 Publicar]  [🎲 Publicar 10 Aleatórios]                        │  │
+│  │  └───────────────────────────────────────────────────────────────────────┘  │
+│  │                                                                              │
+│  │  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  │  Últimas Publicações (sessão)                                         │  │
+│  │  │  ┌──────┬──────────┬────────┬──────────┬────────────────┬──────────┐  │  │
+│  │  │  │  ID  │ Status   │ Amount │ Currency │ Timestamp      │ Result   │  │  │
+│  │  │  ├──────┼──────────┼────────┼──────────┼────────────────┼──────────┤  │  │
+│  │  │  │ abc… │ ✅ Conf. │ 150.00 │ BRL      │ 2026-05-25…    │ ✓ p:0    │  │  │
+│  │  │  │ def… │ ❌ Falha │ 200.00 │ USD      │ 2026-05-25…    │ ✗ erro   │  │  │
+│  │  │  └──────┴──────────┴────────┴──────────┴────────────────┴──────────┘  │  │
+│  │  └───────────────────────────────────────────────────────────────────────┘  │
+│  │                                                                              │
+│  │  ┌───────────────────────────────────────────┐                              │
+│  │  │  [🏠 Dashboard] [📝 Producer] [📖 Docs]  │ ← Navegação                   │
+│  │  └───────────────────────────────────────────┘                              │
+│  └──────────────────────────────────┬──────────────────────────────────────────┘
+│                                     │
+│            ┌────────────────────────┼────────────────────────────┐
+│            │ GET /producer          │ POST /api/publish          │
+│            │ (static HTML)          │ (JSON PaymentEvent)        │
+│            ▼                        ▼                            │
+│                                                                   │
+│  ┌───────────────────────────────────────────────────────────────┐│
+│  │                  Go HTTP Server (:8081) — UI                   ││
+│  │                                                               ││
+│  │  ┌──────────────────┐  ┌──────────────────┐  ┌─────────────┐  ││
+│  │  │ Static File      │  │ HandlePublish    │  │ Handlers    │  ││
+│  │  │ Server           │  │ POST /api/publish│  │ existentes  │  ││
+│  │  │ (index.html,     │  │                  │  │ (SSE,       │  ││
+│  │  │  producer.html,  │  │ 1. Validar       │  │  payments,  │  ││
+│  │  │  app.js,         │  │ 2. POST HTTP     │  │  metrics,   │  ││
+│  │  │  style.css)      │  │    → producer    │  │  etc.)      │  ││
+│  │  │                  │  │ 3. Retornar 200  │  │             │  ││
+│  │  └──────────────────┘  └────────┬─────────┘  └─────────────┘  ││
+│  │                                 │                             ││
+│  │                    ┌────────────┴────────────┐                ││
+│  │                    │  HTTP Client            │                ││
+│  │                    │  (POST producer:8082)   │                ││
+│  │                    └────────────┬────────────┘                ││
+│  └─────────────────────────────────┼─────────────────────────────┘│
 │                                    │                              │
-│                    ┌───────────────┴───────────────┐              │
-│                    ▼                               ▼              │
-│            ┌──────────────┐               ┌──────────────┐       │
-│            │    Kafka     │               │  Redis       │       │
-│            │ payment.events│              │  Pub/Sub     │       │
-│            └──────┬───────┘               └──────┬───────┘       │
-│                   │                              │                │
-│                   ▼                              ▼                │
-│            ┌──────────────┐               ┌──────────────┐       │
-│            │  Consumer    │               │  SSE Stream  │       │
-│            │  (processa)  │               │  (dashboard) │       │
-│            └──────────────┘               └──────────────┘       │
+│                                    │ POST /publish               │
+│                                    ▼                              │
+│  ┌───────────────────────────────────────────────────────────────┐│
+│  │              Producer Service (:8082)                          ││
+│  │                                                               ││
+│  │  ┌──────────────────┐  ┌──────────────────┐                   ││
+│  │  │ HTTP Server      │  │ producer.Service  │                   ││
+│  │  │ (router)         │──│ Publish()         │                   ││
+│  │  │                  │  │ GenerateBulk()    │                   ││
+│  │  │ POST /publish    │  │                   │                   ││
+│  │  │ POST /publish/   │  │ Header source:    │                   ││
+│  │  │   bulk           │  │ "cli-producer"    │                   ││
+│  │  └──────────────────┘  └────────┬──────────┘                   ││
+│  │                                 │                             ││
+│  │                    ┌────────────┴────────────┐                ││
+│  │                    │  sarama.SyncProducer     │                ││
+│  │                    │  (Kafka client)          │                ││
+│  │                    └────────────┬────────────┘                ││
+│  └─────────────────────────────────┼─────────────────────────────┘│
+│                                    │                              │
+│                                    ▼                              │
+│                            ┌──────────────┐                       │
+│                            │    Kafka      │                       │
+│                            │ payment.events│                       │
+│                            └──────┬───────┘                       │
+│                                   │                               │
+│                                   ▼                               │
+│                            ┌──────────────┐                       │
+│                            │  Consumer    │                       │
+│                            │  (processa)  │                       │
+│                            └──────────────┘                       │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -137,57 +155,60 @@ func (h *Handlers) HandlePublish(w http.ResponseWriter, r *http.Request) {
     // 1. Limitar tamanho do corpo
     r.Body = http.MaxBytesReader(w, r.Body, 100*1024) // 100KB
 
-    // 2. Ler e validar
+    // 2. Ler e validar localmente (apenas estrutura básica)
     var event models.PaymentEvent
     if err := json.NewDecoder(r.Body).Decode(&event); err != nil { ... }
 
-    // 3. Validar com validator existente
-    data, _ := json.Marshal(event)
-    validatedEvent, err := h.validator.Validate(ctx, data)
-    if err != nil { writeError(w, 400, err.Error()); return }
-
-    // 4. Gerar PaymentID se vazio
-    if validatedEvent.PaymentID == "" {
-        validatedEvent.PaymentID = uuid.New().String()
+    // 3. Gerar PaymentID se vazio
+    if event.PaymentID == "" {
+        event.PaymentID = uuid.New().String()
     }
 
-    // 5. Preencher timestamp se vazio
-    if validatedEvent.Timestamp == "" {
-        validatedEvent.Timestamp = time.Now().UTC().Format(time.RFC3339)
+    // 4. Preencher timestamp se vazio
+    if event.Timestamp == "" {
+        event.Timestamp = time.Now().UTC().Format(time.RFC3339)
     }
 
-    // 6. Publicar no Kafka (com timeout)
-    kafkaCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+    // 5. Encaminhar para o Producer Service via HTTP
+    producerURL := h.producerURL + "/publish"
+    
+    ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
     defer cancel()
-    eventData, _ := json.Marshal(validatedEvent)
-    msg := &sarama.ProducerMessage{
-        Topic: h.kafkaTopic,
-        Key:   sarama.StringEncoder(validatedEvent.PaymentID),
-        Value: sarama.ByteEncoder(eventData),
-        Headers: []sarama.RecordHeader{
-            {Key: []byte("source"), Value: []byte("producer-ui")},
-            {Key: []byte("timestamp"), Value: []byte(time.Now().UTC().Format(time.RFC3339))},
-        },
-    }
-    partition, offset, err := h.kafkaProducer.SendMessage(msg)
-    if err != nil { writeError(w, 502, "kafka error: "+err.Error()); return }
 
-    // 7. Publicar no EventBus (Redis Pub/Sub) para SSE
-    if pubErr := h.eventBus.Publish(ctx, validatedEvent); pubErr != nil {
-        h.logger.Warn("eventbus publish failed after kafka success",
-            "payment_id", validatedEvent.PaymentID, "error", pubErr)
-        // Não falha a request — Kafka já publicou
+    body, _ := json.Marshal(event)
+    req, _ := http.NewRequestWithContext(ctx, http.MethodPost, producerURL, bytes.NewReader(body))
+    req.Header.Set("Content-Type", "application/json")
+    
+    resp, err := h.httpClient.Do(req)
+    if err != nil {
+        h.logger.Error("producer service call failed",
+            "payment_id", event.PaymentID, "error", err)
+        writeError(w, 502, "producer service unavailable: "+err.Error())
+        return
+    }
+    defer resp.Body.Close()
+
+    // 6. Encaminhar resposta do Producer para o cliente
+    // O Producer retorna o mesmo formato: {status, payment_id, partition, offset}
+    respBody, _ := io.ReadAll(resp.Body)
+    
+    if resp.StatusCode >= 400 {
+        writeError(w, resp.StatusCode, string(respBody))
+        return
     }
 
-    // 8. Responder sucesso
-    writeJSON(w, 200, map[string]interface{}{
-        "status":     "success",
-        "payment_id": validatedEvent.PaymentID,
-        "partition":  partition,
-        "offset":     offset,
-    })
+    // 7. Responder sucesso (eco da resposta do Producer)
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(resp.StatusCode)
+    w.Write(respBody)
 }
 ```
+
+> **Nota sobre o header `source`**: O header `source` nas mensagens Kafka é
+> definido pelo **Producer Service** (`producer.Service`) como `"cli-producer"`,
+> não pela UI. Isso garante consistência independente da origem (CLI ou UI).
+> O `producer.Service` adiciona o header automaticamente em todas as
+> publicações (ver spec `0003-cli-producer/03-design.md`, seção 2).
 
 ### POST /api/publish/bulk
 
@@ -213,14 +234,30 @@ Gera e publica N eventos aleatórios (default 10, máximo 50).
 }
 ```
 
-**Implementação**: reusa `producer.GenerateBulkEvents(count)` e itera
-chamando o mesmo fluxo de `HandlePublish`.
+**Implementação**: encaminha a requisição para o Producer Service, que
+gera e publica os eventos. A UI não gera eventos localmente — delega
+tudo ao `producer.Service` via HTTP.
 
 ## Modificações no Backend
 
-### 1. Server (`internal/ui/server.go`)
+### 1. Config (`internal/config/config.go`)
 
-O construtor `NewServer` deve receber um `sarama.SyncProducer` adicional:
+Adicionar campo `ProducerURL` em `UIConfig`:
+
+```go
+type UIConfig struct {
+    Port              int    `env:"UI_PORT" default:"8081"`
+    EventBusBuffer    int    `env:"UI_EVENT_BUS_BUFFER" default:"256"`
+    ProducerURL       string `env:"UI_PRODUCER_URL" default:"http://localhost:8082"`
+    ReadTimeout       time.Duration `env:"UI_READ_TIMEOUT" default:"10s"`
+    WriteTimeout      time.Duration `env:"UI_WRITE_TIMEOUT" default:"30s"`
+}
+```
+
+### 2. Server (`internal/ui/server.go`)
+
+O construtor `NewServer` **não** recebe mais `sarama.SyncProducer`. Em vez disso,
+recebe a `ProducerURL` da config e cria um `http.Client` interno:
 
 ```go
 type Server struct {
@@ -234,11 +271,10 @@ func NewServer(
     cfg config.Config,
     rdb *redis.Client,
     dynamoClient *dynamodb.Client,
-    kafkaProducer sarama.SyncProducer,  // NOVO
     logger *slog.Logger,
 ) *Server {
-    eventBus := NewEventBus(rdb, "payment:events", cfg.UIEventBusBuffer, logger)
-    handlers := NewHandlers(rdb, dynamoClient, cfg.DynamoDBTable, eventBus, kafkaProducer, cfg.KafkaTopic, logger)
+    eventBus := NewEventBus(rdb, "payment:events", cfg.UI.EventBusBuffer, logger)
+    handlers := NewHandlers(rdb, dynamoClient, cfg.DynamoDBTable, eventBus, cfg.UI.ProducerURL, logger)
     // ...
 }
 ```
@@ -250,7 +286,7 @@ mux.HandleFunc("POST /api/publish", handlers.HandlePublish)
 mux.HandleFunc("POST /api/publish/bulk", handlers.HandlePublishBulk)
 ```
 
-### 2. Handlers (`internal/ui/handlers.go`)
+### 3. Handlers (`internal/ui/handlers.go`)
 
 Adicionar campos ao `Handlers`:
 
@@ -260,44 +296,48 @@ type Handlers struct {
     dynamo       DynamoDBQueryAPI
     dynamoTbl    string
     eventBus     *EventBus
-    kafkaProducer sarama.SyncProducer  // NOVO
-    kafkaTopic    string                // NOVO
+    producerURL  string                // URL do Producer Service
+    httpClient   *http.Client          // HTTP client para chamar o Producer
     logger       *slog.Logger
+}
+```
+
+O `http.Client` é configurado com timeout de conexão e resposta:
+
+```go
+httpClient := &http.Client{
+    Timeout: 10 * time.Second,
+    Transport: &http.Transport{
+        DialContext: (&net.Dialer{
+            Timeout: 5 * time.Second,
+        }).DialContext,
+        MaxIdleConns:        10,
+        IdleConnTimeout:     30 * time.Second,
+    },
 }
 ```
 
 Adicionar métodos:
 
-- `HandlePublish(w, r)` — publica 1 evento
-- `HandlePublishBulk(w, r)` — publica N eventos aleatórios
+- `HandlePublish(w, r)` — recebe JSON, faz HTTP POST para `producerURL + "/publish"`
+- `HandlePublishBulk(w, r)` — recebe `{"count": N}`, faz HTTP POST para `producerURL + "/publish/bulk"`
 
-### 3. Config (`internal/config/config.go`)
+### 4. `cmd/ui/main.go`
 
-O config já possui `KafkaBrokers` e `KafkaTopic`. O `cmd/ui/main.go` precisará
-conectar ao Kafka:
+**Removido** o produtor Kafka embutido:
 
 ```go
-// Conectar Kafka (sync producer)
-kafkaConfig := sarama.NewConfig()
-kafkaConfig.Producer.Return.Successes = true
-kafkaConfig.Producer.Timeout = 10 * time.Second
-kafkaConfig.Net.DialTimeout = 5 * time.Second
-kafkaConfig.Producer.MaxMessageBytes = 100 * 1024
+// ANTIGO (removido):
+// kafkaProducer, err := sarama.NewSyncProducer(...)
+// defer kafkaProducer.Close()
+// server := ui.NewServer(cfg, rdb, dynamoClient, kafkaProducer, logger)
 
-kafkaProducer, err := sarama.NewSyncProducer(strings.Split(cfg.KafkaBrokers, ","), kafkaConfig)
-if err != nil {
-    logger.Warn("kafka not available, producer UI will be limited", "error", err)
-    kafkaProducer = nil // Handlers tratam nil gracefulmente
-}
-defer func() {
-    if kafkaProducer != nil { kafkaProducer.Close() }
-}()
-
-server := ui.NewServer(cfg, rdb, dynamoClient, kafkaProducer, logger)
+// NOVO:
+server := ui.NewServer(cfg, rdb, dynamoClient, logger)
 ```
 
-**Importante**: Se Kafka não estiver disponível, o servidor **não deve falhar**
-— o handler deve retornar 502 com mensagem clara.
+A UI agora depende apenas de Redis e DynamoDB (já existentes). A comunicação
+com Kafka é feita indiretamente via Producer Service.
 
 ## Frontend (`producer.html` + JS inline)
 
@@ -500,9 +540,10 @@ Adicionar classes:
 ```
 internal/
   ui/
-    server.go              # + Injeção kafkaProducer nas rotas
-    handlers.go            # + HandlePublish, HandlePublishBulk
-    handlers_test.go       # + Testes dos novos handlers
+    server.go              # NewServer sem kafkaProducer, usa ProducerURL
+    handlers.go            # + HandlePublish, HandlePublishBulk (HTTP client)
+    handlers_test.go       # + Testes dos novos handlers (mock HTTP server)
+    http_client.go         # NOVO: helper de HTTP client para Producer
       static/
         docs/                # Documentação do projeto (copiada de /docs/ no build)
         producer.html        # NOVO: página de publicação
@@ -512,12 +553,12 @@ internal/
 
 cmd/
   ui/
-    main.go                # + Conexão Kafka SyncProducer
+    main.go                # Sem Kafka SyncProducer — apenas NewServer(cfg, rdb, dynamo, logger)
 
 config/
-  config.go                # (já tem KafkaBrokers, KafkaTopic)
+  config.go                # + ProducerURL em UIConfig
 
-docker-compose.yml         # + Env vars Kafka no payment-ui
+docker-compose.yml         # + UI_PRODUCER_URL no payment-ui
 ```
 
 ## Configuração Docker
@@ -527,16 +568,26 @@ Adicionar ao serviço `payment-ui` no `docker-compose.yml`:
 ```yaml
 payment-ui:
   environment:
-    - KAFKA_BROKERS=kafka:9092
-    - KAFKA_TOPIC=payment.events
+    - UI_PRODUCER_URL=http://producer:8082
 ```
+
+> Nota: A UI **não** precisa mais de `KAFKA_BROKERS` ou `KAFKA_TOPIC`.
+> Essas configurações são de responsabilidade exclusiva do Producer Service
+> (`cmd/producer`), que as recebe via suas próprias env vars.
 
 ## Tratamento de Erros
 
-| Cenário                          | HTTP Status | Resposta                               |
-|----------------------------------|-------------|----------------------------------------|
-| Payload inválido (JSON mal formado) | 400     | `{"status":"error","error":"..."}`     |
-| Validação falhou (campos inválidos) | 400     | `{"status":"error","error":"..."}`     |
-| Kafka indisponível               | 502         | `{"status":"error","error":"kafka..."}`|
-| Payload muito grande (>100KB)    | 413         | `{"status":"error","error":"too large"}`|
+| Cenário                          | HTTP Status | Resposta                                       |
+|----------------------------------|-------------|------------------------------------------------|
+| Payload inválido (JSON mal formado) | 400     | `{"status":"error","error":"..."}`             |
+| Validação falhou (campos inválidos) | 400     | `{"status":"error","error":"..."}}`            |
+| Producer Service indisponível    | 502         | `{"status":"error","error":"producer service unavailable: ..."}` |
+| Producer retorna erro (validação, Kafka, etc.) | (eco) | Resposta do Producer é retransmitida         |
+| Payload muito grande (>100KB)    | 413         | `{"status":"error","error":"too large"}`       |
 | Rate limit excedido              | 429         | `{"status":"error","error":"too many requests"}`|
+| Timeout na chamada HTTP ao Producer | 502      | `{"status":"error","error":"producer service timeout"}`|
+
+> A UI atua como proxy reverso leve para o Producer Service nas rotas de
+> publish. Toda validação semântica (valores de campos, UUID, ISO 4217) é
+> delegada ao Producer Service. A UI faz apenas validação estrutural básica
+> (JSON bem formado) e limites de tamanho.

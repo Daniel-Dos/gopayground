@@ -20,14 +20,6 @@ func (m *mockSyncProducer) SendMessage(msg *sarama.ProducerMessage) (partition i
 	return m.sendMessageFunc(msg)
 }
 
-func (m *mockSyncProducer) SendMessages(msgs []*sarama.ProducerMessage) (map[int32][]int64, error) {
-	panic("not implemented")
-}
-
-func (m *mockSyncProducer) Close() error {
-	return nil
-}
-
 func TestDLQPublish_Success(t *testing.T) {
 	var capturedMsg *sarama.ProducerMessage
 

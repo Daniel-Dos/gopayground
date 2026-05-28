@@ -40,7 +40,7 @@ func newTestHandlers(t *testing.T) (*ui.Handlers, *redis.Client, *miniredis.Mini
 	}
 
 	logger := newTestLogger()
-	h := ui.NewHandlers(client, mockDyn, "test_history", nil, nil, "", logger)
+	h := ui.NewHandlers(client, mockDyn, "test_history", nil, "", logger)
 
 	return h, client, mr, mockDyn
 }
@@ -216,7 +216,7 @@ func TestHandlePaymentHistory_WithData(t *testing.T) {
 	}
 
 	logger := newTestLogger()
-	h := ui.NewHandlers(client, mockDyn, "test_history", nil, nil, "", logger)
+	h := ui.NewHandlers(client, mockDyn, "test_history", nil, "", logger)
 	_ = mr
 
 	req := httptest.NewRequest("GET", "/api/payments/test-payment/history", nil)
@@ -255,7 +255,7 @@ func TestHandlePaymentHistory_MissingID(t *testing.T) {
 }
 
 func TestHandlePaymentHistory_DynamoDBError(t *testing.T) {
-	client, mr := setupMiniredis(t)
+	client, _ := setupMiniredis(t)
 	defer client.Close()
 
 	mockDyn := &mockDynamoDB{
@@ -265,8 +265,7 @@ func TestHandlePaymentHistory_DynamoDBError(t *testing.T) {
 	}
 
 	logger := newTestLogger()
-	h := ui.NewHandlers(client, mockDyn, "test_history", nil, nil, "", logger)
-	_ = mr
+	h := ui.NewHandlers(client, mockDyn, "test_history", nil, "", logger)
 
 	req := httptest.NewRequest("GET", "/api/payments/test-id/history", nil)
 	req.SetPathValue("id", "test-id")
@@ -378,7 +377,7 @@ func TestHandleHealth_RedisDown(t *testing.T) {
 	defer client.Close()
 
 	logger := newTestLogger()
-	h := ui.NewHandlers(client, &mockDynamoDB{}, "test_history", nil, nil, "", logger)
+	h := ui.NewHandlers(client, &mockDynamoDB{}, "test_history", nil, "", logger)
 
 	req := httptest.NewRequest("GET", "/healthz", nil)
 	w := httptest.NewRecorder()
@@ -394,7 +393,7 @@ func TestHandleHealth_RedisDown(t *testing.T) {
 
 func TestHandleSSE_NoEventBus(t *testing.T) {
 	logger := newTestLogger()
-	h := ui.NewHandlers(nil, &mockDynamoDB{}, "test_history", nil, nil, "", logger)
+	h := ui.NewHandlers(nil, &mockDynamoDB{}, "test_history", nil, "", logger)
 
 	req := httptest.NewRequest("GET", "/api/events", nil)
 	w := httptest.NewRecorder()

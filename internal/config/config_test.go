@@ -11,15 +11,15 @@ import (
 )
 
 func TestConfigDefaults(t *testing.T) {
-	// Unset relevant env vars to test defaults
+	// Garante que nenhuma env var interfira — testa os valores do config.yaml.
 	for _, key := range []string{
 		"KAFKA_BROKERS", "KAFKA_TOPIC", "KAFKA_DLQ_TOPIC", "KAFKA_CONSUMER_GROUP",
 		"REDIS_ADDR", "REDIS_PASSWORD",
 		"DYNAMODB_ENDPOINT", "DYNAMODB_TABLE",
-		"WORKER_COUNT", "IDEMPOTENCY_TTL_HOURS", "STATUS_TTL_HOURS",
+		"WORKER_COUNT", "WORKER_IDEMPOTENCY_TTL_HOURS", "WORKER_STATUS_TTL_HOURS",
 		"RETRY_MAX_ATTEMPTS", "RETRY_BASE_DELAY_MS",
-		"OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_SERVICE_NAME",
-		"GRACEFUL_SHUTDOWN_TIMEOUT",
+		"OTEL_ENDPOINT", "OTEL_SERVICE_NAME",
+		"SERVER_GRACEFUL_SHUTDOWN_TIMEOUT",
 		"UI_PORT", "UI_EVENT_BUS_BUFFER", "UI_READ_TIMEOUT", "UI_WRITE_TIMEOUT",
 	} {
 		os.Unsetenv(key)
@@ -27,32 +27,45 @@ func TestConfigDefaults(t *testing.T) {
 
 	cfg := config.NewConfig()
 
-	assert.Equal(t, "localhost:9092", cfg.KafkaBrokers)
-	assert.Equal(t, "payment.events", cfg.KafkaTopic)
-	assert.Equal(t, "payment.events.dlq", cfg.KafkaDLQTopic)
-	assert.Equal(t, "payment-consumer-group", cfg.KafkaConsumerGroup)
-	assert.Equal(t, "localhost:6379", cfg.RedisAddr)
-	assert.Equal(t, "", cfg.RedisPassword)
-	assert.Equal(t, "http://localhost:4566", cfg.DynamoDBEndpoint)
-	assert.Equal(t, "payment_history", cfg.DynamoDBTable)
-	assert.Equal(t, 10, cfg.WorkerCount)
-	assert.Equal(t, 24, cfg.IdempotencyTTLHours)
-	assert.Equal(t, 168, cfg.StatusTTLHours)
-	assert.Equal(t, 3, cfg.RetryMaxAttempts)
-	assert.Equal(t, 100, cfg.RetryBaseDelayMs)
-	assert.Equal(t, "localhost:4317", cfg.OTelEndpoint)
-	assert.Equal(t, "payment-consumer", cfg.OTelServiceName)
-	assert.Equal(t, 30*time.Second, cfg.GracefulShutdownTimeout)
+	// Kafka
+	assert.Equal(t, "localhost:9092", cfg.Kafka.Brokers)
+	assert.Equal(t, "payment.events", cfg.Kafka.Topic)
+	assert.Equal(t, "payment.events.dlq", cfg.Kafka.DLQTopic)
+	assert.Equal(t, "payment-consumer-group", cfg.Kafka.ConsumerGroup)
 
-	// UI defaults
-	assert.Equal(t, "8081", cfg.UIPort)
-	assert.Equal(t, 256, cfg.UIEventBusBuffer)
-	assert.Equal(t, 10*time.Second, cfg.UIReadTimeout)
-	assert.Equal(t, 30*time.Second, cfg.UIWriteTimeout)
+	// Redis
+	assert.Equal(t, "localhost:6379", cfg.Redis.Addr)
+	assert.Equal(t, "", cfg.Redis.Password)
+
+	// DynamoDB
+	assert.Equal(t, "http://localhost:4566", cfg.DynamoDB.Endpoint)
+	assert.Equal(t, "payment_history", cfg.DynamoDB.Table)
+
+	// Worker
+	assert.Equal(t, 10, cfg.Worker.Count)
+	assert.Equal(t, 24, cfg.Worker.IdempotencyTTLHours)
+	assert.Equal(t, 168, cfg.Worker.StatusTTLHours)
+
+	// Retry
+	assert.Equal(t, 3, cfg.Retry.MaxAttempts)
+	assert.Equal(t, 100, cfg.Retry.BaseDelayMs)
+
+	// OTel
+	assert.Equal(t, "localhost:4317", cfg.OTel.Endpoint)
+	assert.Equal(t, "payment-consumer", cfg.OTel.ServiceName)
+
+	// Server
+	assert.Equal(t, 30*time.Second, cfg.Server.GracefulShutdownTimeout)
+
+	// UI
+	assert.Equal(t, "8081", cfg.UI.Port)
+	assert.Equal(t, 256, cfg.UI.EventBusBuffer)
+	assert.Equal(t, 10*time.Second, cfg.UI.ReadTimeout)
+	assert.Equal(t, 30*time.Second, cfg.UI.WriteTimeout)
 }
 
 func TestConfigEnvOverrides(t *testing.T) {
-	// Set env vars
+	// Configura env vars para sobrescrever os valores do config.yaml.
 	os.Setenv("KAFKA_BROKERS", "broker1:9092,broker2:9092")
 	os.Setenv("KAFKA_TOPIC", "custom.events")
 	os.Setenv("KAFKA_DLQ_TOPIC", "custom.dlq")
@@ -62,13 +75,13 @@ func TestConfigEnvOverrides(t *testing.T) {
 	os.Setenv("DYNAMODB_ENDPOINT", "http://dynamo:8000")
 	os.Setenv("DYNAMODB_TABLE", "custom_history")
 	os.Setenv("WORKER_COUNT", "5")
-	os.Setenv("IDEMPOTENCY_TTL_HOURS", "48")
-	os.Setenv("STATUS_TTL_HOURS", "72")
+	os.Setenv("WORKER_IDEMPOTENCY_TTL_HOURS", "48")
+	os.Setenv("WORKER_STATUS_TTL_HOURS", "72")
 	os.Setenv("RETRY_MAX_ATTEMPTS", "5")
 	os.Setenv("RETRY_BASE_DELAY_MS", "200")
-	os.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "otel:4317")
+	os.Setenv("OTEL_ENDPOINT", "otel:4317")
 	os.Setenv("OTEL_SERVICE_NAME", "custom-service")
-	os.Setenv("GRACEFUL_SHUTDOWN_TIMEOUT", "10s")
+	os.Setenv("SERVER_GRACEFUL_SHUTDOWN_TIMEOUT", "10s")
 	os.Setenv("UI_PORT", "9090")
 	os.Setenv("UI_EVENT_BUS_BUFFER", "512")
 	os.Setenv("UI_READ_TIMEOUT", "5s")
@@ -84,13 +97,13 @@ func TestConfigEnvOverrides(t *testing.T) {
 		os.Unsetenv("DYNAMODB_ENDPOINT")
 		os.Unsetenv("DYNAMODB_TABLE")
 		os.Unsetenv("WORKER_COUNT")
-		os.Unsetenv("IDEMPOTENCY_TTL_HOURS")
-		os.Unsetenv("STATUS_TTL_HOURS")
+		os.Unsetenv("WORKER_IDEMPOTENCY_TTL_HOURS")
+		os.Unsetenv("WORKER_STATUS_TTL_HOURS")
 		os.Unsetenv("RETRY_MAX_ATTEMPTS")
 		os.Unsetenv("RETRY_BASE_DELAY_MS")
-		os.Unsetenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+		os.Unsetenv("OTEL_ENDPOINT")
 		os.Unsetenv("OTEL_SERVICE_NAME")
-		os.Unsetenv("GRACEFUL_SHUTDOWN_TIMEOUT")
+		os.Unsetenv("SERVER_GRACEFUL_SHUTDOWN_TIMEOUT")
 		os.Unsetenv("UI_PORT")
 		os.Unsetenv("UI_EVENT_BUS_BUFFER")
 		os.Unsetenv("UI_READ_TIMEOUT")
@@ -99,28 +112,28 @@ func TestConfigEnvOverrides(t *testing.T) {
 
 	cfg := config.NewConfig()
 
-	assert.Equal(t, "broker1:9092,broker2:9092", cfg.KafkaBrokers)
-	assert.Equal(t, "custom.events", cfg.KafkaTopic)
-	assert.Equal(t, "custom.dlq", cfg.KafkaDLQTopic)
-	assert.Equal(t, "custom-group", cfg.KafkaConsumerGroup)
-	assert.Equal(t, "redis:6379", cfg.RedisAddr)
-	assert.Equal(t, "secret123", cfg.RedisPassword)
-	assert.Equal(t, "http://dynamo:8000", cfg.DynamoDBEndpoint)
-	assert.Equal(t, "custom_history", cfg.DynamoDBTable)
-	assert.Equal(t, 5, cfg.WorkerCount)
-	assert.Equal(t, 48, cfg.IdempotencyTTLHours)
-	assert.Equal(t, 72, cfg.StatusTTLHours)
-	assert.Equal(t, 5, cfg.RetryMaxAttempts)
-	assert.Equal(t, 200, cfg.RetryBaseDelayMs)
-	assert.Equal(t, "otel:4317", cfg.OTelEndpoint)
-	assert.Equal(t, "custom-service", cfg.OTelServiceName)
-	assert.Equal(t, 10*time.Second, cfg.GracefulShutdownTimeout)
+	assert.Equal(t, "broker1:9092,broker2:9092", cfg.Kafka.Brokers)
+	assert.Equal(t, "custom.events", cfg.Kafka.Topic)
+	assert.Equal(t, "custom.dlq", cfg.Kafka.DLQTopic)
+	assert.Equal(t, "custom-group", cfg.Kafka.ConsumerGroup)
+	assert.Equal(t, "redis:6379", cfg.Redis.Addr)
+	assert.Equal(t, "secret123", cfg.Redis.Password)
+	assert.Equal(t, "http://dynamo:8000", cfg.DynamoDB.Endpoint)
+	assert.Equal(t, "custom_history", cfg.DynamoDB.Table)
+	assert.Equal(t, 5, cfg.Worker.Count)
+	assert.Equal(t, 48, cfg.Worker.IdempotencyTTLHours)
+	assert.Equal(t, 72, cfg.Worker.StatusTTLHours)
+	assert.Equal(t, 5, cfg.Retry.MaxAttempts)
+	assert.Equal(t, 200, cfg.Retry.BaseDelayMs)
+	assert.Equal(t, "otel:4317", cfg.OTel.Endpoint)
+	assert.Equal(t, "custom-service", cfg.OTel.ServiceName)
+	assert.Equal(t, 10*time.Second, cfg.Server.GracefulShutdownTimeout)
 
 	// UI overrides
-	assert.Equal(t, "9090", cfg.UIPort)
-	assert.Equal(t, 512, cfg.UIEventBusBuffer)
-	assert.Equal(t, 5*time.Second, cfg.UIReadTimeout)
-	assert.Equal(t, 60*time.Second, cfg.UIWriteTimeout)
+	assert.Equal(t, "9090", cfg.UI.Port)
+	assert.Equal(t, 512, cfg.UI.EventBusBuffer)
+	assert.Equal(t, 5*time.Second, cfg.UI.ReadTimeout)
+	assert.Equal(t, 60*time.Second, cfg.UI.WriteTimeout)
 }
 
 func TestConfigServerPortDefault(t *testing.T) {

@@ -22,7 +22,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// Handler implements sarama.ConsumerGroupHandler.
+// Handler implementa sarama.ConsumerGroupHandler para processar mensagens do Kafka.
 type Handler struct {
 	validator      validator.Validator
 	idempotency    idempotency.Checker
@@ -37,7 +37,7 @@ type Handler struct {
 	logger    *slog.Logger
 	tracer    trace.Tracer
 
-	// Metrics
+	// Métricas OTel para observabilidade do consumer
 	messagesReceived   metric.Int64Counter
 	messagesProcessed  metric.Int64Counter
 	processingDuration metric.Float64Histogram
@@ -46,7 +46,7 @@ type Handler struct {
 	idempotencyHits    metric.Int64Counter
 }
 
-// NewHandler creates a new consumer handler.
+// NewHandler cria um novo handler para processar mensagens do consumidor Kafka.
 func NewHandler(
 	validator validator.Validator,
 	idempotency idempotency.Checker,
@@ -125,7 +125,7 @@ func (h *Handler) initMetrics(meter metric.Meter) {
 	}
 }
 
-// Setup is run at the beginning of a new session, before ConsumeClaim.
+// Setup é executado no início de uma nova sessão, antes do ConsumeClaim.
 func (h *Handler) Setup(session sarama.ConsumerGroupSession) error {
 	h.logger.Info("consumer session started",
 		"member_id", session.MemberID(),
@@ -134,7 +134,7 @@ func (h *Handler) Setup(session sarama.ConsumerGroupSession) error {
 	return nil
 }
 
-// Cleanup is run at the end of a session, once all ConsumeClaim goroutines have exited.
+// Cleanup é executado ao final de uma sessão, após todas as goroutines do ConsumeClaim terminarem.
 func (h *Handler) Cleanup(session sarama.ConsumerGroupSession) error {
 	h.logger.Info("consumer session ended",
 		"member_id", session.MemberID(),
@@ -143,7 +143,7 @@ func (h *Handler) Cleanup(session sarama.ConsumerGroupSession) error {
 	return nil
 }
 
-// ConsumeClaim must start a consumer loop of ConsumerGroupClaim's Messages().
+// ConsumeClaim inicia o loop de consumo das mensagens do ConsumerGroupClaim.
 func (h *Handler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for msg := range claim.Messages() {
 		h.messagesReceived.Add(session.Context(), 1,

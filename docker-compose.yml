@@ -97,6 +97,7 @@ services:
       DYNAMODB_ENDPOINT: http://floci:4566
       DYNAMODB_TABLE: payment_history
       # OpenTelemetry
+      OTEL_ENDPOINT: otel-collector:4317
       OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
       OTEL_SERVICE_NAME: payment-consumer
       # Worker pool
@@ -139,6 +140,10 @@ services:
       # Override default broker via environment (also supported by flag parsing)
       KAFKA_BROKERS: kafka:9092
       KAFKA_TOPIC: payment.events
+      # OpenTelemetry
+      OTEL_ENDPOINT: otel-collector:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      OTEL_SERVICE_NAME: payment-producer
     depends_on:
       kafka:
         condition: service_started
@@ -160,10 +165,8 @@ services:
       - "8081:8081"
     environment:
       UI_PORT: 8081
+      UI_PRODUCER_URL: http://producer:8082
       REDIS_ADDR: redis:6379
-      # Kafka
-      KAFKA_BROKERS: kafka:9092
-      KAFKA_TOPIC: payment.events
       # DynamoDB / AWS (static credentials for local Floci)
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
@@ -171,6 +174,7 @@ services:
       DYNAMODB_ENDPOINT: http://floci:4566
       DYNAMODB_TABLE: payment_history
       # OpenTelemetry
+      OTEL_ENDPOINT: otel-collector:4317
       OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
       OTEL_SERVICE_NAME: payment-ui
     depends_on:

@@ -78,7 +78,8 @@ O formulário deve conter os seguintes campos:
 
 - HTML + CSS + JavaScript vanilla
 - Sem frameworks, sem bibliotecas externas
-- Sem novas dependências Go (reutilizar `sarama`, `validator`, `models` existentes)
+- Sem novas dependências Go (usa apenas stdlib `net/http` para comunicação HTTP com o Producer Service; reutiliza `models`, `validator` existentes)
+- A UI **não** depende mais de `sarama` (Kafka client) — essa responsabilidade é do Producer Service
 
 ### RNF-05 — Validação Frontend
 
@@ -99,6 +100,7 @@ Validar antes de enviar ao servidor:
 
 ### RNF-07 — Performance
 
-- Timeout de 10s para publicação no Kafka
-- Payload máximo: 100KB
+- Timeout de 10s para chamada HTTP ao Producer Service
+- Timeout de conexão de 5s para o Producer Service
+- Payload máximo: 100KB (antes de encaminhar ao Producer)
 - Rate limiting: máximo 1 request a cada 200ms por IP (5 req/s)

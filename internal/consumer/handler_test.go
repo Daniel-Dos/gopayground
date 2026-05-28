@@ -18,7 +18,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// ----- mocks for each interface -----
+// Mocks para cada interface do consumidor
 
 type mockValidator struct {
 	validateFunc func(ctx context.Context, data []byte) (*models.PaymentEvent, error)

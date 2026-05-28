@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Handler defines the interface for retry logic.
+// Handler define a interface para lógica de retry (repetição com backoff).
 type Handler interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
@@ -20,9 +20,9 @@ type retryHandler struct {
 	jitter      float64
 }
 
-// NewHandler creates a new retry handler.
-// Progression: 1x, 3x, 9x the base delay (not binary shift).
-// With baseDelay=100ms: delays are 100ms, 300ms, 900ms for attempts 2, 3, 4.
+// NewHandler cria um novo handler de retry.
+// Progressão: 1x, 3x, 9x o atraso base (não é shift binário).
+// Com baseDelay=100ms: atrasos de 100ms, 300ms, 900ms para tentativas 2, 3, 4.
 func NewHandler(maxAttempts int, baseDelayMs int) Handler {
 	return &retryHandler{
 		maxAttempts: maxAttempts,

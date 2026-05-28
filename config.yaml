@@ -1,2 +1,52 @@
+# Configuração principal da aplicação.
+# Fonte primária de defaults — sobrescrita por variáveis de ambiente (12-Factor).
+# Estrutura aninhada por domínio.
+
 server:
   port: 8080
+  graceful_shutdown_timeout: "30s"
+
+kafka:
+  brokers: "localhost:9092"
+  topic: "payment.events"
+  dlq_topic: "payment.events.dlq"
+  consumer_group: "payment-consumer-group"
+  producer_timeout: "10s"
+  dial_timeout: "10s"
+  read_timeout: "30s"
+  write_timeout: "10s"
+  idempotent: false
+  required_acks: "wait_for_local"
+  max_message_bytes: 1048576
+  version: "2.6.0.0"
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+
+dynamodb:
+  endpoint: "http://localhost:4566"
+  table: "payment_history"
+  region: ""
+  access_key: ""
+  secret_key: ""
+
+ui:
+  port: "8081"
+  producer_url: "http://localhost:8082"
+  event_bus_buffer: 256
+  read_timeout: "10s"
+  write_timeout: "30s"
+
+worker:
+  count: 10
+  idempotency_ttl_hours: 24
+  status_ttl_hours: 168
+
+retry:
+  max_attempts: 3
+  base_delay_ms: 100
+
+otel:
+  endpoint: "localhost:4317"
+  service_name: "payment-consumer"

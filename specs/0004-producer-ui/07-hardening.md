@@ -2,35 +2,48 @@
 
 ## Resiliência
 
-### Timeout na Publicação Kafka
+### Timeout na Chamada HTTP ao Producer Service
 
-- `sarama.Config.Producer.Timeout = 10 * time.Second`
-- `sarama.Config.Net.DialTimeout = 5 * time.Second`
-- Context com timeout de 10s no handler `HandlePublish`
+- Timeout total de 10s por chamada HTTP (`context.WithTimeout`)
+- Timeout de conexão de 5s (`net.Dialer.Timeout`)
+- Timeout de idle connection de 30s para reuso de conexões HTTP keep-alive
 
 ```go
-kafkaCtx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+// HTTP client configurado no NewHandlers
+h.httpClient = &http.Client{
+    Timeout: 10 * time.Second,
+    Transport: &http.Transport{
+        DialContext: (&net.Dialer{
+            Timeout: 5 * time.Second,
+        }).DialContext,
+        MaxIdleConns:    10,
+        IdleConnTimeout: 30 * time.Second,
+    },
+}
+
+// Handler usa context com timeout
+ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 defer cancel()
-msg := &sarama.ProducerMessage{...}
-partition, offset, err := h.kafkaProducer.SendMessage(msg)
+req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
+resp, err := h.httpClient.Do(req)
 ```
 
-### Kafka Indisponível
+### Producer Service Indisponível
 
-- Se `kafkaProducer` for `nil` (falha na conexão inicial), todos os handlers de
-  publish retornam 502 imediatamente
-- Não há retry no handler (o usuário pode tentar novamente via frontend)
+- Se o Producer Service não responder (timeout, conexão recusada, DNS), o
+  handler retorna 502 com mensagem clara
+- Não há retry automático no handler (o usuário pode tentar novamente via frontend)
 - A UI e a dashboard continuam funcionando normalmente (apenas publish afetado)
 
-### EventBus Indisponível
+### Producer Service Retorna Erro
 
-- Publicação no EventBus é feita com timeout curto (2s) via `context.WithTimeout`
-- Se falhar, apenas log.Warn + continua (evento já foi para o Kafka)
-- O consumer vai processar e eventualmente o evento aparecerá na dashboard
+- Se o Producer Service retornar HTTP 4xx/5xx, a UI ecoa a resposta para o cliente
+- O body de erro do Producer é retransmitido sem alteração
+- Log estruturado de erro com `payment_id`, status code e resposta
 
 ### Payload Máximo
 
-- `http.MaxBytesReader(w, r.Body, 100*1024)` — 100KB
+- `http.MaxBytesReader(w, r.Body, 100*1024)` — 100KB (antes de encaminhar ao Producer)
 - Se excedido, Go retorna 413 automaticamente
 
 ## Concorrência
@@ -67,8 +80,8 @@ func rateLimitMiddleware(next http.Handler) http.Handler {
 
 ### Goroutine Safety
 
-- `sarama.SyncProducer` é thread-safe (documentado)
-- `EventBus.Publish` usa Redis Pub/Sub (thread-safe)
+- `http.Client` do stdlib é thread-safe e reusável entre goroutines
+- Cada request HTTP usa seu próprio `context.Context` (sem compartilhamento)
 - Rate limit usa `sync.Map` (thread-safe)
 - Nenhuma goroutine extra é criada no handler
 
@@ -77,54 +90,54 @@ func rateLimitMiddleware(next http.Handler) http.Handler {
 ### Logs Estruturados
 
 ```go
-// Sucesso
+// Sucesso (eco da resposta do Producer)
 h.logger.Info("event published via UI",
     "payment_id", event.PaymentID,
     "status", event.Status,
     "amount", event.Amount,
     "currency", event.Currency,
-    "partition", partition,
-    "offset", offset,
+    "producer_status", resp.StatusCode,
     "remote_addr", r.RemoteAddr,
 )
 
-// Erro Kafka
-h.logger.Error("kafka publish failed",
+// Erro de conexão com Producer
+h.logger.Error("producer service call failed",
     "payment_id", event.PaymentID,
+    "producer_url", h.producerURL,
     "error", err,
     "remote_addr", r.RemoteAddr,
 )
 
-// Erro EventBus (não crítico)
-h.logger.Warn("eventbus publish failed after kafka success",
+// Erro retornado pelo Producer
+h.logger.Error("producer returned error",
     "payment_id", event.PaymentID,
-    "error", pubErr,
+    "producer_status", resp.StatusCode,
+    "producer_body", string(respBody),
+    "remote_addr", r.RemoteAddr,
 )
 ```
 
 ### Métricas
 
 Sugestão para versão futura (não implementar agora):
-- `producer_events_published_total` (counter)
-- `producer_events_failed_total` (counter)
-- `producer_publish_duration_seconds` (histogram)
+- `ui_publish_requests_total` (counter)
+- `ui_publish_errors_total` (counter) — com label `error_type` (timeout, connection, producer_error)
+- `ui_publish_duration_seconds` (histogram) — latência da chamada HTTP ao Producer
 
 ### Tracing
 
-O header `source: producer-ui` já é adicionado nas mensagens Kafka,
-permitindo rastrear a origem do evento no consumer.
+O rastreamento da origem do evento é feito pelo header `source: cli-producer`
+que o Producer Service adiciona em todas as mensagens Kafka. A UI pode
+adicionar headers de tracing (ex: `X-Request-ID`, `X-Trace-ID`) nas chamadas
+HTTP ao Producer para correlação de logs.
 
 ## Segurança Operacional
 
-### Validação de Payload (Backend)
+### Validação de Payload
 
-Reutilizar o `validator.Validator` existente que valida:
-- `payment_id`: obrigatório, UUID v4
-- `status`: obrigatório, one of (pending, confirmed, failed, refunded)
-- `amount`: obrigatório, > 0
-- `currency`: obrigatório, len 3, uppercase
-- `description`: opcional, max 255, printable ASCII
-- `timestamp`: obrigatório, RFC3339
+A UI faz uma validação estrutural básica (JSON bem formado, limites de
+tamanho). A validação semântica completa (UUID, ISO 4217, campos
+obrigatórios) é delegada ao Producer Service.
 
 ### Validação de Payload (Frontend)
 
@@ -136,9 +149,8 @@ Antes de enviar ao servidor:
 
 ### Proteção contra Payload Grande
 
-- `http.MaxBytesReader`: 100KB
+- `http.MaxBytesReader`: 100KB (proteção contra payload gigante na UI)
 - Frontend limita description a 255 caracteres (maxlength)
-- Validação rejeita description > 255 antes de chegar ao Kafka
 
 ### Headers de Segurança
 
@@ -153,7 +165,7 @@ Não necessário (mesma origem — frontend e backend servidos na mesma porta 80
 
 ### Secrets
 
-- Kafka brokers e tópico configurados via variáveis de ambiente
+- `UI_PRODUCER_URL` configurada via variável de ambiente
 - Nenhuma senha ou token no código
 - Redis password já configurada via env var (existente)
 
@@ -161,30 +173,34 @@ Não necessário (mesma origem — frontend e backend servidos na mesma porta 80
 
 ### Graceful Shutdown
 
-- O `kafkaProducer.Close()` é chamado no defer do `main()`
-- Chamado antes do `server.Shutdown()` garantir que novas publicações parem
-- O shutdown já existente (15s timeout) cobre o fechamento do producer
+- Não há mais `kafkaProducer.Close()` no shutdown
+- O shutdown existente (15s timeout) continua cobrindo o server HTTP
+- Requests HTTP em andamento para o Producer Service são canceladas via
+  contexto do request (`r.Context()`)
 
 ### Readiness / Liveness
 
-- O endpoint `/healthz` já existente verifica Redis
-- Em versão futura, pode-se adicionar verificação de conectividade Kafka
-- Se Kafka estiver down, o health check ainda retorna OK (apenas publish afetado)
+- O endpoint `/healthz` já existente verifica Redis e DynamoDB
+- Não verifica o Producer Service (publish não crítico para health check)
+- Se Producer Service estiver down, o health check ainda retorna OK
 
 ### Comportamento sob Falha Parcial
 
-| Falta            | Impacto                                      | Comportamento Esperado          |
-|------------------|----------------------------------------------|---------------------------------|
-| Kafka down       | Publish retorna 502                          | UI continua, dashboard normal   |
-| Redis down       | EventBus fallha (warning), Kafka OK          | Dashboard sem SSE, publish OK   |
-| DynamoDB down    | Nenhum (não usado no publish)                | Normal                          |
-| Kafka + Redis    | Publish retorna 502                          | UI operacional, sem publish     |
+| Falta                   | Impacto                                       | Comportamento Esperado          |
+|-------------------------|-----------------------------------------------|---------------------------------|
+| Producer Service down   | Publish retorna 502                           | UI continua, dashboard normal   |
+| Producer timeout        | Publish retorna 502                           | UI continua, dashboard normal   |
+| Producer retorna erro   | Erro ecoado ao cliente (4xx/5xx)              | UI continua, dashboard normal   |
+| Redis down              | Dashboard sem SSE, publish ainda funciona     | Publish via Producer ainda OK   |
+| DynamoDB down           | Histórico indisponível, publish funciona      | Publish via Producer ainda OK   |
 
 ### Rollback
 
-Se necessário reverter:
-1. Reverter alterações em `server.go`, `handlers.go`, `main.go`
-2. Remover `producer.html`, `producer.js`
-3. Reverter `index.html` (remover link de navegação)
-4. Reverter `docker-compose.yml`
-5. Build e deploy
+Se necessário reverter para Kafka embutido:
+1. Reverter `config.go` (remover `ProducerURL`)
+2. Reverter `server.go` (voltar `NewServer` com `sarama.SyncProducer`)
+3. Reverter `handlers.go` (voltar `HandlePublish` com `sarama`)
+4. Reverter `main.go` (voltar conexão Kafka)
+5. Reverter `docker-compose.yml` (voltar `KAFKA_BROKERS` no `payment-ui`)
+6. Remover `producer.html`, `producer.js` se não desejados
+7. Build e deploy

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Daniel-Dos/gopayground/internal/kafka"
 	"github.com/Daniel-Dos/gopayground/internal/models"
 	"github.com/Daniel-Dos/gopayground/internal/validator"
 
@@ -13,14 +14,12 @@ import (
 	"github.com/google/uuid"
 )
 
-type SyncProducer interface {
-	SendMessage(msg *sarama.ProducerMessage) (partition int32, offset int64, err error)
-}
-
+// Service define o contrato para publicação de eventos.
 type Service interface {
 	Publish(ctx context.Context, events []*models.PaymentEvent, rate int) []Result
 }
 
+// Result contém o resultado da publicação de um evento.
 type Result struct {
 	Event     *models.PaymentEvent
 	Partition int32
@@ -28,13 +27,15 @@ type Result struct {
 	Error     error
 }
 
+// service é a implementação concreta de Service.
 type service struct {
-	producer  SyncProducer
+	producer  kafka.SyncProducer
 	topic     string
 	validator validator.Validator
 }
 
-func New(producer SyncProducer, topic string, v validator.Validator) Service {
+// New cria um novo Service com o produtor, tópico e validador fornecidos.
+func New(producer kafka.SyncProducer, topic string, v validator.Validator) Service {
 	return &service{
 		producer:  producer,
 		topic:     topic,

@@ -98,6 +98,27 @@ Para uma versão visual interativa, abra o arquivo [`docs/diagrams/architecture-
 4. Em caso de falha permanente → **Dead Letter Queue** (tópico `payment.events.dlq`)
 5. **Payment UI** exibe dados em tempo real via SSE e consulta Redis/DynamoDB
 
+### Fluxo de Publicação (UI → Producer HTTP → Kafka)
+
+A partir do ADR-013, a UI não publica mais diretamente no Kafka. Em vez disso, ela delega a publicação ao serviço **Producer** standalone via HTTP:
+
+```
+Browser → UI (8081) → HTTP POST → Producer (8082) → Kafka
+```
+
+**Fluxo detalhado:**
+
+1. O browser faz `POST /api/publish` ou `POST /api/publish/bulk` na UI (porta 8081)
+2. A UI valida o payload e faz um HTTP POST para `producer:8082/publish` ou `producer:8082/publish/bulk`
+3. O Producer publica o evento no Kafka via Sarama SyncProducer e retorna `{payment_id, partition, offset}`
+4. A UI recebe a resposta e **também** publica o evento no EventBus (Redis Pub/Sub) para alimentar o SSE em tempo real
+
+**Implicações:**
+- Logs de publicação são centralizados no Producer
+- A UI não precisa mais de dependências Kafka diretas
+- Se o Producer estiver off, os endpoints de publicação retornam 502 (mas consultas e SSE continuam funcionando)
+- Latência adicional de ~10-50ms pelo round-trip HTTP
+
 ## Pré-requisitos
 
 - Go 1.26+
@@ -248,8 +269,8 @@ A Payment UI oferece uma interface web para monitoramento em tempo real e també
 | `GET` | `/api/payments/{id}/history` | Histórico completo de um pagamento no DynamoDB |
 | `GET` | `/api/metrics` | Métricas agregadas (total, por status, taxa de sucesso) |
 | `GET` | `/healthz` | Health check (Redis) |
-| `POST` | `/api/publish` | Publica **um** evento de pagamento no Kafka |
-| `POST` | `/api/publish/bulk` | Publica **N** eventos gerados automaticamente (1–100) |
+| `POST` | `/api/publish` | Publica **um** evento de pagamento via Producer HTTP (porta 8082) |
+| `POST` | `/api/publish/bulk` | Publica **N** eventos gerados automaticamente (1–100) via Producer HTTP |
 
 ### Exemplos de Uso com `curl`
 
@@ -289,7 +310,7 @@ curl -N http://localhost:8081/api/events
 
 - **Redis**: obrigatório — armazena status dos pagamentos e canal Pub/Sub para SSE
 - **DynamoDB**: obrigatório — armazena histórico completo
-- **Kafka**: opcional — se indisponível, os endpoints `POST /api/publish` e `POST /api/publish/bulk` retornam 502, mas a UI continua funcionando para consulta
+- **Producer HTTP** (porta 8082): obrigatório para publicação — se indisponível, os endpoints `POST /api/publish` e `POST /api/publish/bulk` retornam 502, mas a UI continua funcionando para consulta e SSE
 
 ### Documentação completa
 
@@ -319,7 +340,7 @@ Configure via variáveis de ambiente (veja `docs/observability.md`).
 | `docs/producer.md`                  | Documentação completa do producer (CLI + HTTP) |
 | `docs/features/cli-producer.md`     | Detalhes do modo CLI (publish) do producer |
 | `docs/diagrams/`             | Diagramas Excalidraw da arquitetura do projeto   |
-| `adrs/`                      | Architecture Decision Records (12 ADRs)          |
+| `adrs/`                      | Architecture Decision Records (13 ADRs)          |
 | `specs/` (pastas)            | Specs SDD completas de cada feature              |
 
 ## Decisões Arquiteturais (ADRs)
@@ -339,7 +360,8 @@ As principais decisões arquiteturais estão documentadas em formato ADR formal 
 | 009 | Worker Pool com Semáforo | `adrs/ADR-009-worker-pool-concurrency.md` |
 | 010 | Dead Letter Queue Estratégia | `adrs/ADR-010-dlq-strategy.md` |
 | 011 | OpenTelemetry para Observabilidade | `adrs/ADR-011-opentelemetry-observability.md` |
-| 012 | Graceful Shutdown | `adrs/ADR-012-graceful-shutdown.md`
+| 012 | Graceful Shutdown | `adrs/ADR-012-graceful-shutdown.md` |
+| 013 | UI publica eventos via Producer HTTP | `adrs/ADR-013-ui-producer-http.md` |
 
 ## Licença
 

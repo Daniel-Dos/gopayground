@@ -17,137 +17,101 @@ import (
 	"github.com/Daniel-Dos/gopayground/internal/events"
 	"github.com/Daniel-Dos/gopayground/internal/history"
 	"github.com/Daniel-Dos/gopayground/internal/idempotency"
+	"github.com/Daniel-Dos/gopayground/internal/kafka"
+	"github.com/Daniel-Dos/gopayground/internal/provider"
 	"github.com/Daniel-Dos/gopayground/internal/retry"
 	"github.com/Daniel-Dos/gopayground/internal/status"
 	"github.com/Daniel-Dos/gopayground/internal/validator"
 	"github.com/Daniel-Dos/gopayground/pkg/telemetry"
 
-	"github.com/IBM/sarama"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/redis/go-redis/v9"
 	"go.opentelemetry.io/otel"
 )
 
 func main() {
-	// 1. Load config
+	// 1. Carregar configurações
 	cfg := config.NewConfig()
 
-	// 2. Configure logging
+	// 2. Configurar logger estruturado
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
 
-	logger.Info("starting payment consumer", "service", cfg.OTelServiceName)
+	logger.Info("iniciando consumidor de pagamentos", "service", cfg.OTel.ServiceName)
 
-	// 3. Initialize OTel
+	// 3. Inicializar OpenTelemetry
 	ctx := context.Background()
 
 	tp, err := telemetry.InitTracerProvider(ctx, cfg)
 	if err != nil {
-		logger.Error("failed to initialize tracer provider", "error", err)
+		logger.Error("falha ao inicializar tracer provider", "error", err)
 		os.Exit(1)
 	}
 	defer func() {
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.GracefulShutdownTimeout)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.Server.GracefulShutdownTimeout)
 		defer cancel()
 		if err := tp.Shutdown(shutdownCtx); err != nil {
-			logger.Error("tracer provider shutdown error", "error", err)
+			logger.Error("erro ao desligar tracer provider", "error", err)
 		}
 	}()
 
 	mp, err := telemetry.InitMeterProvider(ctx, cfg)
 	if err != nil {
-		logger.Error("failed to initialize meter provider", "error", err)
+		logger.Error("falha ao inicializar meter provider", "error", err)
 		os.Exit(1)
 	}
 	defer func() {
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.GracefulShutdownTimeout)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.Server.GracefulShutdownTimeout)
 		defer cancel()
 		if err := mp.Shutdown(shutdownCtx); err != nil {
-			logger.Error("meter provider shutdown error", "error", err)
+			logger.Error("erro ao desligar meter provider", "error", err)
 		}
 	}()
 
-	meter := otel.Meter(cfg.OTelServiceName)
-	tracer := otel.Tracer(cfg.OTelServiceName)
+	meter := otel.Meter(cfg.OTel.ServiceName)
+	tracer := otel.Tracer(cfg.OTel.ServiceName)
 
-	// 4. Connect Redis
-	rdb := redis.NewClient(&redis.Options{
-		Addr:         cfg.RedisAddr,
-		Password:     cfg.RedisPassword,
-		DialTimeout:  5 * time.Second,
-		ReadTimeout:  3 * time.Second,
-		WriteTimeout: 3 * time.Second,
-	})
+	// 4. Conectar ao Redis (cliente centralizado via provider)
+	rdb := provider.NewRedisClient(provider.DefaultRedisConfig(cfg.Redis.Addr, cfg.Redis.Password))
 	defer func() {
 		if err := rdb.Close(); err != nil {
-			logger.Error("redis close error", "error", err)
+			logger.Error("erro ao fechar Redis", "error", err)
 		}
 	}()
 
-	// Verify Redis connection
+	// Verifica conexão Redis (não bloqueante — aviso apenas)
 	if err := rdb.Ping(ctx).Err(); err != nil {
-		logger.Warn("redis not available at startup, will retry", "error", err)
+		logger.Warn("redis não disponível na inicialização, tentará novamente", "error", err)
 	}
 
-	// 5. Connect DynamoDB
-	var loadOpts []func(*awsconfig.LoadOptions) error
-
-	// When using local DynamoDB (Floci/LocalStack), use static credentials
-	// to avoid EC2 IMDS lookup failures in non-EC2 environments.
-	if isLocalEndpoint(cfg.DynamoDBEndpoint) {
-		logger.Info("using static AWS credentials for local DynamoDB endpoint",
-			"endpoint", cfg.DynamoDBEndpoint)
-		loadOpts = append(loadOpts,
-			awsconfig.WithCredentialsProvider(
-				credentials.NewStaticCredentialsProvider("test", "test", ""),
-			),
-			awsconfig.WithRegion("us-east-1"),
-		)
-	}
-
-	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, loadOpts...)
+	// 5. Conectar ao DynamoDB (cliente centralizado via provider)
+	dynamoClient, err := provider.NewDynamoDBClient(ctx, provider.DynamoDBConfig{
+		Endpoint:  cfg.DynamoDB.Endpoint,
+		Region:    cfg.DynamoDB.Region,
+		AccessKey: cfg.DynamoDB.AccessKey,
+		SecretKey: cfg.DynamoDB.SecretKey,
+	})
 	if err != nil {
-		logger.Error("failed to load AWS config", "error", err)
+		logger.Error("falha ao conectar no DynamoDB", "error", err)
 		os.Exit(1)
 	}
 
-	dynamoClient := dynamodb.NewFromConfig(awsCfg, func(o *dynamodb.Options) {
-		if cfg.DynamoDBEndpoint != "" {
-			o.BaseEndpoint = aws.String(cfg.DynamoDBEndpoint)
-		}
-	})
-
-	// 5b. Ensure DynamoDB table exists (auto-create in dev/local environments)
+	// 5b. Garantir que a tabela DynamoDB existe (criação automática em dev/local)
 	{
 		tableCtx, tableCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer tableCancel()
-		if err := history.EnsureTable(tableCtx, dynamoClient, cfg.DynamoDBTable, logger); err != nil {
-			logger.Error("failed to ensure dynamodb table", "error", err)
+		if err := history.EnsureTable(tableCtx, dynamoClient, cfg.DynamoDB.Table, logger); err != nil {
+			logger.Error("falha ao garantir tabela DynamoDB", "error", err)
 			os.Exit(1)
 		}
 	}
 
-	// 6. Configure Kafka
-	kafkaCfg := sarama.NewConfig()
-	kafkaCfg.Version = sarama.V2_6_0_0
-	kafkaCfg.Consumer.Return.Errors = true
-	kafkaCfg.Consumer.Offsets.Initial = sarama.OffsetOldest
-	kafkaCfg.Consumer.Group.Rebalance.Strategy = sarama.BalanceStrategyRoundRobin
-	kafkaCfg.Consumer.MaxProcessingTime = 30 * time.Second
-	kafkaCfg.Producer.Return.Successes = true
-	kafkaCfg.Producer.Return.Errors = true
-	kafkaCfg.Producer.RequiredAcks = sarama.WaitForAll
-	kafkaCfg.Producer.Idempotent = false
-	kafkaCfg.Net.DialTimeout = 10 * time.Second
-	kafkaCfg.Net.ReadTimeout = 30 * time.Second
-	kafkaCfg.Net.WriteTimeout = 10 * time.Second
+	// 6. Configurar Kafka
+	consumerCfg := kafka.NewConsumerSaramaConfig(kafka.DefaultConsumerConfig())
+	brokers := strings.Split(cfg.Kafka.Brokers, ",")
 
-	brokers := strings.Split(cfg.KafkaBrokers, ",")
-
-	consumerGroup, err := sarama.NewConsumerGroup(brokers, cfg.KafkaConsumerGroup, kafkaCfg)
+	consumerGroup, err := kafka.NewConsumerGroup(brokers, cfg.Kafka.ConsumerGroup, consumerCfg)
 	if err != nil {
 		logger.Error("failed to create consumer group", "error", err)
 		os.Exit(1)
@@ -158,7 +122,8 @@ func main() {
 		}
 	}()
 
-	syncProducer, err := sarama.NewSyncProducer(brokers, kafkaCfg)
+	producerCfg := kafka.NewProducerSaramaConfig(kafka.DefaultProducerConfig())
+	syncProducer, err := kafka.NewSyncProducerWithRetry(ctx, brokers, producerCfg)
 	if err != nil {
 		logger.Error("failed to create sync producer", "error", err)
 		os.Exit(1)
@@ -169,18 +134,18 @@ func main() {
 		}
 	}()
 
-	// 7. Instantiate components
-	validator := validator.New()
-	idempotencyChecker := idempotency.NewChecker(rdb, cfg.IdempotencyTTLHours)
-	statusUpdater := status.NewUpdater(rdb, cfg.StatusTTLHours)
-	historyRecorder := history.NewRecorder(dynamoClient, cfg.DynamoDBTable)
-	retryHandler := retry.NewHandler(cfg.RetryMaxAttempts, cfg.RetryBaseDelayMs)
-	dlqProducer := dlq.NewProducer(syncProducer, cfg.KafkaDLQTopic)
+	// 7. Instanciar componentes
+	payloadValidator := validator.New()
+	idempotencyChecker := idempotency.NewChecker(rdb, cfg.Worker.IdempotencyTTLHours)
+	statusUpdater := status.NewUpdater(rdb, cfg.Worker.StatusTTLHours)
+	historyRecorder := history.NewRecorder(dynamoClient, cfg.DynamoDB.Table)
+	retryHandler := retry.NewHandler(cfg.Retry.MaxAttempts, cfg.Retry.BaseDelayMs)
+	dlqProducer := dlq.NewProducer(syncProducer, cfg.Kafka.DLQTopic)
 	eventPublisher := events.NewRedisPublisher(rdb, "payment:events")
 
-	// 8. Create handler
+	// 8. Criar handler do consumidor
 	handler := consumer.NewHandler(
-		validator,
+		payloadValidator,
 		idempotencyChecker,
 		statusUpdater,
 		historyRecorder,
@@ -188,72 +153,61 @@ func main() {
 		dlqProducer,
 		rdb,
 		eventPublisher,
-		cfg.WorkerCount,
+		cfg.Worker.Count,
 		meter,
 		tracer,
 	)
 
-	// 9. Graceful shutdown
+	// 9. Configurar desligamento gracioso (SIGINT/SIGTERM)
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	// 10. HTTP health endpoint (in a goroutine)
-	healthServer := startHealthServer(cfg.Server.Port, rdb, dynamoClient, cfg.DynamoDBTable, logger)
+	// 10. Servidor HTTP de health check (em goroutine separada)
+	healthServer := startHealthServer(cfg.Server.Port, rdb, dynamoClient, cfg.DynamoDB.Table, logger)
 
-	// 11. Consumer loop
-	topics := []string{cfg.KafkaTopic}
+	// 11. Loop principal do consumidor Kafka
+	topics := []string{cfg.Kafka.Topic}
 	consumeCtx, consumeCancel := context.WithCancel(context.Background())
 	defer consumeCancel()
 
 	go func() {
 		select {
 		case <-sigCh:
-			logger.Info("shutdown signal received")
+			logger.Info("sinal de desligamento recebido")
 			consumeCancel()
 		case <-consumeCtx.Done():
 		}
 	}()
 
-	// Ensure health server is shut down when consumer exits
+	// Garantir que o servidor de health check seja desligado ao sair
 	defer func() {
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer shutdownCancel()
 		if err := healthServer.Shutdown(shutdownCtx); err != nil {
-			logger.Error("health server shutdown error", "error", err)
+			logger.Error("erro ao desligar servidor de health check", "error", err)
 		}
-		logger.Info("health server stopped")
+		logger.Info("servidor de health check parado")
 	}()
 
-	logger.Info("starting consumer loop",
+	logger.Info("iniciando loop do consumidor",
 		"topics", topics,
-		"group", cfg.KafkaConsumerGroup,
-		"workers", cfg.WorkerCount,
+		"group", cfg.Kafka.ConsumerGroup,
+		"workers", cfg.Worker.Count,
 	)
 
 	for {
 		select {
 		case <-consumeCtx.Done():
-			logger.Info("consumer loop exiting")
+			logger.Info("loop do consumidor finalizado")
 			return
 		default:
 			if err := consumerGroup.Consume(consumeCtx, topics, handler); err != nil {
-				logger.Error("consume error", "error", err)
-				// Wait a bit before retrying to avoid tight loop
+				logger.Error("erro no consumo", "error", err)
+				// Pequena pausa antes de tentar novamente para evitar loop intenso
 				time.Sleep(1 * time.Second)
 			}
 		}
 	}
-}
-
-// isLocalEndpoint checks whether the given DynamoDB endpoint points to a
-// local/test container (Floci, LocalStack, localhost) that accepts any
-// static credentials, avoiding the need for EC2 IMDS or real AWS credentials.
-func isLocalEndpoint(endpoint string) bool {
-	lower := strings.ToLower(endpoint)
-	return strings.Contains(lower, "localhost") ||
-		strings.Contains(lower, "127.0.0.1") ||
-		strings.Contains(lower, "floci") ||
-		strings.Contains(lower, "localstack")
 }
 
 func startHealthServer(port int, rdb *redis.Client, dynamoClient *dynamodb.Client, table string, logger *slog.Logger) *http.Server {

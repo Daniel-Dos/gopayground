@@ -57,28 +57,37 @@ dashboard (`cmd/ui`), usando o mesmo `embed.FS` para arquivos estáticos.
 
 ## Sistemas Envolvidos
 
-| Sistema     | Função                                        | Acesso pela Producer UI |
-|-------------|-----------------------------------------------|-------------------------|
-| **Kafka**   | Destino dos eventos publicados                | Escrita (via API)       |
-| **Redis**   | Publicação no EventBus para feed SSE em tempo real | Escrita            |
-| **Consumer**| Consome os eventos e persiste (status + histórico) | Indireto (via Kafka) |
+| Sistema           | Função                                                  | Acesso pela Producer UI |
+|-------------------|---------------------------------------------------------|-------------------------|
+| **Kafka**         | Destino final dos eventos publicados                    | Indireto (via Producer Service → HTTP → Kafka) |
+| **Producer Service** | Serviço standalone que valida e publica no Kafka     | POST HTTP `/publish` e `/publish/bulk` |
+| **Redis**         | Armazenamento de status para dashboard (leitura)        | Leitura (para dashboard, não para publish) |
+| **Consumer**      | Consome os eventos e persiste (status + histórico)      | Indireto (via Kafka) |
 
 ---
 
-## Fluxo de Dados (novo)
+## Fluxo de Dados (atualizado)
 
 ```
 Browser (Producer UI)
     │
     │ POST /api/publish  (JSON PaymentEvent)
     ▼
-Go HTTP Server (:8081)
+Go HTTP Server — UI (:8081)
     │
-    ├── Valida payload (reusa validator existente)
+    ├── Valida estrutura básica (JSON, limites de tamanho)
+    ├── Faz HTTP POST para Producer Service (producer:8082/publish)
+    │
+    ▼
+Producer Service (:8082)
+    │
+    ├── Valida payload semanticamente (UUID, ISO 4217, campos)
     ├── Publica no Kafka (tópico payment.events)
-    ├── Publica no Redis Pub/Sub (canal payment:events)
-    │       └── EventBus distribui para SSE clients
+    │       └── Header source: "cli-producer" (definido no producer)
     └── Retorna 200 + resultado (partition, offset)
+            │
+            ▼
+        UI retransmite resposta ao Browser
 ```
 
 ---

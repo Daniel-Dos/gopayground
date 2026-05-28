@@ -14,12 +14,12 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// DynamoDBPutItemAPI defines the interface for the DynamoDB PutItem operation.
+// DynamoDBPutItemAPI define a interface para a operação PutItem do DynamoDB.
 type DynamoDBPutItemAPI interface {
 	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
 }
 
-// Recorder defines the interface for recording payment history.
+// Recorder define a interface para registrar histórico de pagamentos.
 type Recorder interface {
 	RecordHistory(ctx context.Context, event *models.PaymentEvent) error
 }
@@ -29,7 +29,7 @@ type dynamoRecorder struct {
 	table  string
 }
 
-// NewRecorder creates a new DynamoDB-based history recorder.
+// NewRecorder cria um novo gravador de histórico baseado em DynamoDB.
 func NewRecorder(client DynamoDBPutItemAPI, table string) Recorder {
 	return &dynamoRecorder{client: client, table: table}
 }

@@ -6,27 +6,24 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Daniel-Dos/gopayground/internal/kafka"
+
 	"github.com/IBM/sarama"
 	"go.opentelemetry.io/otel/trace"
 )
 
-// SyncProducer defines the minimal interface for producing messages.
-type SyncProducer interface {
-	SendMessage(msg *sarama.ProducerMessage) (partition int32, offset int64, err error)
-}
-
-// Producer defines the interface for publishing messages to DLQ.
+// Producer define a interface para publicar mensagens na DLQ (Dead Letter Queue).
 type Producer interface {
 	Publish(ctx context.Context, msg *sarama.ConsumerMessage, err error) error
 }
 
 type kafkaDLQProducer struct {
-	producer SyncProducer
+	producer kafka.SyncProducer
 	topic    string
 }
 
-// NewProducer creates a new Kafka DLQ producer.
-func NewProducer(producer SyncProducer, topic string) Producer {
+// NewProducer cria um novo produtor Kafka para a DLQ.
+func NewProducer(producer kafka.SyncProducer, topic string) Producer {
 	return &kafkaDLQProducer{producer: producer, topic: topic}
 }
 
@@ -66,19 +63,27 @@ func (kp *kafkaDLQProducer) Publish(ctx context.Context, msg *sarama.ConsumerMes
 		Headers: allHeaders,
 	}
 
-	// Enforce context timeout for SendMessage (sarama's SendMessage doesn't accept context)
-	doneCh := make(chan error, 1)
+	return kp.sendWithContext(ctx, dlqMsg)
+}
+
+// sendWithContext encapsula o SendMessage do Sarama com suporte a contexto.
+func (kp *kafkaDLQProducer) sendWithContext(ctx context.Context, msg *sarama.ProducerMessage) error {
+	type result struct {
+		err error
+	}
+
+	ch := make(chan result, 1)
 	go func() {
-		_, _, sendErr := kp.producer.SendMessage(dlqMsg)
-		doneCh <- sendErr
+		_, _, sendErr := kp.producer.SendMessage(msg)
+		ch <- result{err: sendErr}
 	}()
 
 	select {
 	case <-ctx.Done():
 		return fmt.Errorf("dlq publish cancelled: %w", ctx.Err())
-	case sendErr := <-doneCh:
-		if sendErr != nil {
-			return fmt.Errorf("dlq publish error: %w", sendErr)
+	case r := <-ch:
+		if r.err != nil {
+			return fmt.Errorf("dlq publish error: %w", r.err)
 		}
 		return nil
 	}
