@@ -1,5 +1,9 @@
 # GoPayground
 
+<div align="center">
+  <img src="docs/logo.svg" alt="GoPayground logo" width="400">
+</div>
+
 [![GoPayground](https://img.shields.io/badge/GoPayground-github.com/Daniel--Dos/gopayground-blue?logo=github)](https://github.com/Daniel-Dos/gopayground)
 
 **Distributed payment event processing in Go — Kafka, Redis, DynamoDB, OpenTelemetry.**
@@ -384,6 +388,8 @@ Configure via variáveis de ambiente (veja `docs/observability.md`).
 | `docs/ui.md`                        | Documentação completa da UI (API, páginas, exemplos curl) |
 | `docs/producer.md`                  | Documentação completa do producer (CLI + HTTP) |
 | `docs/features/cli-producer.md`     | Detalhes do modo CLI (publish) do producer |
+| `docs/onboarding.md`                | Guia de onboarding para novos engenheiros |
+| `docs/onboarding.html`              | Versão HTML interativa do onboarding |
 | `docs/diagrams/`             | Diagramas da arquitetura (JPG + fonte `.excalidraw`) |
 | `adrs/`                      | Architecture Decision Records (13 ADRs)          |
 | `specs/` (pastas)            | Specs SDD completas de cada feature              |

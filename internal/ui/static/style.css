@@ -137,6 +137,14 @@ header {
     gap: 14px;
 }
 
+.brand-logo {
+    height: 40px;
+    width: auto;
+    flex-shrink: 0;
+    display: block;
+    filter: drop-shadow(0 0 8px rgba(214, 158, 46, 0.15));
+}
+
 .brand-icon {
     display: flex;
     align-items: center;
@@ -1351,6 +1359,10 @@ table {
         border-radius: 0 0 var(--radius) var(--radius);
     }
 
+    .brand-logo {
+        height: 34px;
+    }
+
     .brand-icon {
         width: 34px;
         height: 34px;
@@ -1451,6 +1463,10 @@ table {
 
     .header-brand {
         gap: 10px;
+    }
+
+    .brand-logo {
+        height: 30px;
     }
 
     .brand-icon {

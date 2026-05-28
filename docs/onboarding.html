@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Onboarding — GoPayground</title>
+<meta name="description" content="Guia de onboarding para novos desenvolvedores no GoPayground.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ===== RESET & BASE ===== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy: #0c1b33;
+    --navy-light: #132a4a;
+    --navy-mid: #1e3a5f;
+    --copper: #d9773e;
+    --copper-light: #e8945a;
+    --copper-glow: rgba(217, 119, 62, 0.15);
+    --blue-accent: #4a8fe0;
+    --surface: #f7f5f0;
+    --card: #ffffff;
+    --text: #1a1a2e;
+    --text-secondary: #4a5568;
+    --text-muted: #7a8294;
+    --border: #e4e1da;
+    --border-light: #efede8;
+    --code-bg: #0d1117;
+    --code-text: #e6edf3;
+    --code-keyword: #ff7b72;
+    --code-string: #a5d6ff;
+    --code-comment: #8b949e;
+    --code-type: #ffa657;
+    --code-func: #d2a8ff;
+    --code-number: #79c0ff;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --error: #ef4444;
+    --sidebar-width: 280px;
+    --header-h: 0px;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  html { scroll-behavior: smooth; font-size: 16px; }
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    color: var(--text);
+    background: var(--surface);
+    line-height: 1.7;
+    display: flex;
+    min-height: 100vh;
+  }
+  a { color: var(--copper); text-decoration: none; transition: color .2s; }
+  a:hover { color: var(--copper-light); }
+  a:focus-visible { outline: 2px solid var(--copper); outline-offset: 2px; border-radius: 2px; }
+  img, svg { max-width: 100%; display: block; }
+  ::selection { background: var(--copper); color: #fff; }
+
+  /* ===== SIDEBAR ===== */
+  .sidebar {
+    position: fixed; top: 0; left: 0;
+    width: var(--sidebar-width); height: 100vh;
+    background: var(--navy);
+    color: #d1d5db;
+    overflow-y: auto;
+    z-index: 100;
+    display: flex; flex-direction: column;
+    border-right: 1px solid rgba(255,255,255,.06);
+  }
+  .sidebar-header {
+    padding: 1.5rem 1.25rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    flex-shrink: 0;
+  }
+  .sidebar-header .logo {
+    font-family: 'Sora', sans-serif;
+    font-weight: 800;
+    font-size: 1.35rem;
+    color: #fff;
+    display: flex; align-items: center; gap: .5rem;
+  }
+  .sidebar-header .logo span { color: var(--copper); }
+  .sidebar-header .subtitle {
+    font-size: .78rem;
+    color: var(--text-muted);
+    margin-top: .2rem;
+    letter-spacing: .02em;
+  }
+  .sidebar nav { padding: .75rem 0; flex: 1; overflow-y: auto; }
+  .sidebar nav a {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: .5rem 1.25rem;
+    font-size: .875rem;
+    color: #9ca3af;
+    border-left: 3px solid transparent;
+    transition: all .2s;
+    text-decoration: none;
+  }
+  .sidebar nav a:hover { color: #e5e7eb; background: rgba(255,255,255,.04); }
+  .sidebar nav a.active {
+    color: #fff;
+    background: rgba(217, 119, 62, .12);
+    border-left-color: var(--copper);
+    font-weight: 500;
+  }
+  .sidebar nav a .nav-icon {
+    width: 20px; height: 20px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: .85rem;
+    opacity: .6;
+  }
+  .sidebar nav .nav-section-label {
+    padding: .75rem 1.25rem .25rem;
+    font-size: .65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--text-muted);
+  }
+  .sidebar-footer {
+    padding: .75rem 1.25rem;
+    border-top: 1px solid rgba(255,255,255,.06);
+    font-size: .72rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+  .sidebar-footer a { color: #9ca3af; }
+  .sidebar-footer a:hover { color: var(--copper-light); }
+
+  /* ===== MOBILE TOGGLE ===== */
+  .mobile-toggle {
+    display: none;
+    position: fixed; top: .75rem; left: .75rem; z-index: 200;
+    width: 40px; height: 40px;
+    border: none; background: var(--navy);
+    color: #fff;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    align-items: center; justify-content: center;
+    font-size: 1.25rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,.2);
+    transition: background .2s;
+  }
+  .mobile-toggle:hover { background: var(--navy-mid); }
+  .mobile-toggle:focus-visible { outline: 2px solid var(--copper); outline-offset: 2px; }
+
+  /* overlay */
+  .sidebar-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.4);
+    z-index: 99;
+  }
+  .sidebar-overlay.open { display: block; }
+
+  /* ===== MAIN CONTENT ===== */
+  .main {
+    margin-left: var(--sidebar-width);
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+  }
+  .hero {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 50%, var(--navy-mid) 100%);
+    padding: 4rem 3rem 3rem;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 80% 20%, var(--copper-glow) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .hero > * { position: relative; z-index: 1; }
+  .logo-container {
+    margin-bottom: 1.5rem;
+  }
+
+  .onboarding-logo {
+    max-width: 280px;
+    height: auto;
+    display: block;
+    filter: drop-shadow(0 2px 12px rgba(217, 119, 62, 0.2));
+  }
+
+  .hero h1 {
+    font-family: 'Sora', sans-serif;
+    font-size: 2.8rem;
+    font-weight: 800;
+    line-height: 1.15;
+    margin-bottom: .75rem;
+  }
+  .hero h1 span { color: var(--copper); }
+  .hero p {
+    font-size: 1.1rem;
+    color: #b0c4d8;
+    max-width: 640px;
+    line-height: 1.6;
+  }
+  .hero .meta-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    margin-top: 1.25rem;
+    padding: .4rem .9rem;
+    background: rgba(255,255,255,.08);
+    border-radius: 100px;
+    font-size: .8rem;
+    color: #b0c4d8;
+    border: 1px solid rgba(255,255,255,.06);
+  }
+  .hero .meta-badge strong { color: #fff; font-weight: 600; }
+
+  /* ===== CONTENT CONTAINER ===== */
+  .content {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 2.5rem 2rem 4rem;
+  }
+
+  /* ===== TYPOGRAPHY ===== */
+  .content h2 {
+    font-family: 'Sora', sans-serif;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--navy);
+    margin-top: 3rem;
+    margin-bottom: 1rem;
+    line-height: 1.25;
+    padding-bottom: .5rem;
+    border-bottom: 2px solid var(--border);
+    scroll-margin-top: 1rem;
+  }
+  .content h2:first-of-type { margin-top: 0; }
+  .content h3 {
+    font-family: 'Sora', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--navy-light);
+    margin-top: 2rem;
+    margin-bottom: .6rem;
+    line-height: 1.3;
+  }
+  .content h4 {
+    font-family: 'Sora', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-top: 1.5rem;
+    margin-bottom: .4rem;
+  }
+  .content p { margin-bottom: .9rem; color: var(--text); }
+  .content p + p { margin-top: -.4rem; }
+  .content strong { font-weight: 600; color: var(--navy); }
+  .content em { font-style: italic; }
+  .content blockquote {
+    margin: 1.5rem 0;
+    padding: 1rem 1.25rem;
+    background: #f1ede5;
+    border-left: 4px solid var(--copper);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+  .content blockquote p { margin-bottom: 0; }
+  .content blockquote strong { color: var(--navy); }
+  .content hr {
+    margin: 2.5rem 0;
+    border: none;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--border), transparent);
+  }
+
+  /* ===== LISTS ===== */
+  .content ol, .content ul {
+    margin: .6rem 0 1rem 1.5rem;
+    color: var(--text);
+  }
+  .content li { margin-bottom: .35rem; }
+  .content li > ol, .content li > ul { margin-top: .2rem; margin-bottom: .2rem; }
+
+  /* ===== TIPS / CALLOUTS ===== */
+  .callout {
+    margin: 1.5rem 0;
+    padding: 1rem 1.25rem;
+    border-radius: var(--radius-sm);
+    border-left: 4px solid;
+    font-size: .92rem;
+  }
+  .callout-info {
+    background: #eef2ff;
+    border-color: var(--blue-accent);
+    color: #1e3a5f;
+  }
+  .callout-warn {
+    background: #fffbeb;
+    border-color: var(--warning);
+    color: #92400e;
+  }
+  .callout-tip {
+    background: #f0fdf4;
+    border-color: var(--success);
+    color: #166534;
+  }
+  .callout strong { color: inherit; }
+
+  /* ===== TABLES ===== */
+  .content .table-wrap {
+    overflow-x: auto;
+    margin: 1rem 0 1.5rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+  }
+  .content table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .875rem;
+  }
+  .content thead {
+    background: var(--navy);
+    color: #fff;
+  }
+  .content th {
+    padding: .7rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .content td {
+    padding: .65rem 1rem;
+    border-bottom: 1px solid var(--border-light);
+    vertical-align: top;
+  }
+  .content tbody tr:last-child td { border-bottom: none; }
+  .content tbody tr:hover { background: #faf8f4; }
+  .content table code {
+    font-size: .8rem;
+    background: transparent;
+    padding: 0;
+    color: var(--navy-mid);
+  }
+
+  /* ===== CODE BLOCKS ===== */
+  .content pre {
+    margin: 1rem 0 1.5rem;
+    padding: 1.1rem 1.25rem;
+    background: var(--code-bg);
+    color: var(--code-text);
+    border-radius: var(--radius-sm);
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .82rem;
+    line-height: 1.6;
+    tab-size: 2;
+    position: relative;
+  }
+  .content pre.has-header { padding-top: 2.5rem; }
+  .content pre .lang-label {
+    position: absolute;
+    top: 0; left: 0;
+    padding: .25rem .7rem;
+    font-size: .65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-muted);
+    background: rgba(255,255,255,.04);
+    border-radius: 0 0 var(--radius-sm) 0;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .content pre code {
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+    background: none;
+    padding: 0;
+  }
+  .content :not(pre) > code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .82rem;
+    background: #eae7e0;
+    color: var(--navy);
+    padding: .1rem .4rem;
+    border-radius: 4px;
+    word-break: break-word;
+  }
+
+  /* CSS-only syntax highlight */
+  .hljs-keyword,
+  .hljs-kw { color: var(--code-keyword); }
+  .hljs-string,
+  .hljs-str { color: var(--code-string); }
+  .hljs-comment,
+  .hljs-cmt { color: var(--code-comment); font-style: italic; }
+  .hljs-type,
+  .hljs-typ { color: var(--code-type); }
+  .hljs-function,
+  .hljs-func { color: var(--code-func); }
+  .hljs-number,
+  .hljs-num { color: var(--code-number); }
+  .hljs-built_in,
+  .hljs-bi { color: #7ee787; }
+  .hljs-attr { color: #79c0ff; }
+  .hljs-punctuation { color: #d2a8ff; }
+
+  /* ===== ASCII DIAGRAMS ===== */
+  .diagram-wrap {
+    margin: 1rem 0 1.5rem;
+    background: #0a0e14;
+    border-radius: var(--radius-sm);
+    overflow-x: auto;
+    position: relative;
+    border: 1px solid rgba(255,255,255,.06);
+  }
+  .diagram-wrap .lang-label {
+    position: absolute;
+    top: 0; left: 0;
+    padding: .2rem .65rem;
+    font-size: .62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-muted);
+    background: rgba(255,255,255,.04);
+    border-radius: 0 0 var(--radius-sm) 0;
+    font-family: 'DM Sans', sans-serif;
+    z-index: 1;
+  }
+  .diagram-wrap pre {
+    margin: 0;
+    padding: 1.25rem;
+    background: transparent;
+    color: #56b4c8;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .72rem;
+    line-height: 1.3;
+  }
+  .diagram-wrap pre .dim { color: var(--text-muted); }
+  .diagram-wrap pre .hl { color: var(--copper-light); }
+  .diagram-wrap pre .green { color: #7ee787; }
+  .diagram-wrap pre .blue { color: #79c0ff; }
+  .diagram-wrap pre .pink { color: var(--code-func); }
+
+  /* ===== STEP LIST ===== */
+  .step-list { counter-reset: step; }
+  .step-item {
+    counter-increment: step;
+    margin: 1rem 0;
+    padding: 1rem 1rem 1rem 3rem;
+    position: relative;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    transition: box-shadow .2s;
+  }
+  .step-item:hover { box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+  .step-item::before {
+    content: counter(step);
+    position: absolute; left: .75rem; top: .75rem;
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--navy);
+    color: #fff;
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: .8rem;
+    border-radius: 50%;
+  }
+  .step-item h4 { margin-top: 0; margin-bottom: .3rem; font-size: .95rem; }
+  .step-item p { margin-bottom: 0; font-size: .9rem; color: var(--text-secondary); }
+  .step-item pre { margin: .5rem 0 0; font-size: .78rem; }
+  .step-item > :last-child { margin-bottom: 0; }
+
+  /* ===== GLOSSARY ===== */
+  .glossary-term {
+    margin: .8rem 0;
+    padding: .75rem 1rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .glossary-term h4 {
+    margin: 0 0 .3rem;
+    font-family: 'Sora', sans-serif;
+    font-size: .9rem;
+    color: var(--copper);
+  }
+  .glossary-term h4 code {
+    font-size: .85rem;
+    background: transparent;
+    padding: 0;
+    color: inherit;
+  }
+  .glossary-term p {
+    margin: 0;
+    font-size: .88rem;
+    color: var(--text-secondary);
+  }
+
+  /* ===== CARD GRID ===== */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0 1.5rem;
+  }
+  .card-grid .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1rem 1.1rem;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .card-grid .card:hover {
+    border-color: var(--copper);
+    box-shadow: 0 2px 12px var(--copper-glow);
+  }
+  .card-grid .card h4 {
+    font-family: 'Sora', sans-serif;
+    font-size: .85rem;
+    margin: 0 0 .3rem;
+    color: var(--navy);
+  }
+  .card-grid .card p {
+    font-size: .82rem;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  /* ===== FLOW ARROW ===== */
+  .flow-arrow {
+    display: flex; align-items: center; justify-content: center;
+    gap: .5rem;
+    padding: .5rem 0;
+    font-size: .75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-weight: 600;
+  }
+  .flow-arrow .arrow { color: var(--copper); font-size: 1.2rem; }
+
+  /* ===== SECTION DIVIDER ===== */
+  .section-divider {
+    display: flex; align-items: center;
+    gap: 1rem;
+    margin: 2.5rem 0;
+    color: var(--text-muted);
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+  }
+  .section-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, var(--border), transparent);
+  }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 900px) {
+    .sidebar { transform: translateX(-100%); transition: transform .3s cubic-bezier(.4,0,.2,1); }
+    .sidebar.open { transform: translateX(0); }
+    .mobile-toggle { display: flex; }
+    .main { margin-left: 0; }
+    .hero { padding: 3rem 1.5rem 2rem; }
+    .onboarding-logo { max-width: 220px; }
+    .hero h1 { font-size: 2rem; }
+    .hero p { font-size: 1rem; }
+    .content { padding: 1.5rem 1.25rem 3rem; }
+  }
+  @media (max-width: 600px) {
+    .hero h1 { font-size: 1.6rem; }
+    .content h2 { font-size: 1.35rem; }
+    .content h3 { font-size: 1.05rem; }
+    .card-grid { grid-template-columns: 1fr; }
+    .content pre { font-size: .75rem; padding: .9rem 1rem; }
+    .diagram-wrap pre { font-size: .6rem; }
+    .step-item { padding-left: 2.5rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; }
+  }
+  @media print {
+    .sidebar, .mobile-toggle, .sidebar-overlay { display: none !important; }
+    .main { margin-left: 0 !important; }
+    .hero { background: var(--navy) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .content pre, .diagram-wrap { break-inside: avoid; }
+  }
+
+  /* ===== SCROLLBAR ===== */
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 4px; }
+  .content pre::-webkit-scrollbar, .diagram-wrap::-webkit-scrollbar { height: 6px; }
+  .content pre::-webkit-scrollbar-thumb, .diagram-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<!-- ===== MOBILE TOGGLE ===== -->
+<button class="mobile-toggle" id="menuToggle" aria-label="Abrir menu de navegação" aria-expanded="false">☰</button>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- ===== SIDEBAR ===== -->
+<aside class="sidebar" id="sidebar" role="navigation" aria-label="Navegação principal">
+  <div class="sidebar-header">
+    <div class="logo">Go<span>Play</span>ground</div>
+    <div class="subtitle">Onboarding para novos engenheiros</div>
+  </div>
+  <nav>
+    <div class="nav-section-label">Guia</div>
+    <a href="#boas-vindas" class="active"><span class="nav-icon">👋</span>Boas-vindas</a>
+    <a href="#o-que-e"><span class="nav-icon">🔍</span>O que é o GoPayground</a>
+    <a href="#arquitetura"><span class="nav-icon">🏗️</span>Arquitetura em 5 min</a>
+    <a href="#fluxo-pagamento"><span class="nav-icon">⚡</span>Fluxo de um pagamento</a>
+    <a href="#primeiros-passos"><span class="nav-icon">🚀</span>Primeiros passos</a>
+    <a href="#estrutura-codigo"><span class="nav-icon">📁</span>Estrutura do código</a>
+    <a href="#como-contribuir"><span class="nav-icon">🤝</span>Como contribuir (SDD)</a>
+    <a href="#glossario"><span class="nav-icon">📖</span>Glossário</a>
+    <a href="#onde-buscar-ajuda"><span class="nav-icon">🆘</span>Onde buscar ajuda</a>
+  </nav>
+  <div class="sidebar-footer">
+    <a href="https://github.com/Daniel-Dos/gopayground" target="_blank" rel="noopener">GitHub</a> &middot; v1.0
+  </div>
+</aside>
+
+<!-- ===== MAIN ===== -->
+<main class="main">
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="logo-container">
+      <img src="logo.svg" alt="GoPayground" class="onboarding-logo">
+    </div>
+    <h1>Bem-vindo ao <span>GoPayground</span></h1>
+    <p>Este guia foi feito para te ajudar a entender o sistema do zero. Não se preocupe se alguns termos parecerem novos — tudo será explicado ao longo do texto.</p>
+    <div class="meta-badge">
+      <strong>Guia de onboarding</strong> &middot; Payment Platform &middot; Go 1.26
+    </div>
+  </header>
+
+  <div class="content">
+
+    <!-- ===== BOAS-VINDAS ===== -->
+    <section id="boas-vindas">
+      <h2>👋 Boas-vindas</h2>
+      <p>Você acabou de entrar no time de <strong>Payment Platform</strong> e vai trabalhar com o <strong>GoPayground</strong>, um sistema distribuído de processamento de eventos de pagamento escrito em Go.</p>
+      <p>Seu primeiro objetivo é entender como o sistema funciona por completo: como um evento de pagamento "anda" do momento em que é criado até aparecer na tela de um usuário. Este documento te guia por cada parte.</p>
+      <blockquote>Não hesite em perguntar se algo não ficar claro. Todo mundo aqui já passou pela mesma curva de aprendizado.</blockquote>
+    </section>
+
+    <hr>
+
+    <!-- ===== O QUE É O GOPLAYGROUND ===== -->
+    <section id="o-que-e">
+      <h2>🔍 O que é o GoPayground</h2>
+      <p>O GoPayground é um <strong>ambiente de experimentação prática com sistemas distribuídos em Go</strong>. O nome "playground" não é à toa: ele foi criado para simular um sistema real de processamento de pagamentos, mas em um ambiente controlado que você pode rodar no seu próprio computador com Docker.</p>
+
+      <p>Na prática, o sistema:</p>
+      <ol>
+        <li><strong>Recebe</strong> eventos de pagamento (uma compra, um reembolso, etc.)</li>
+        <li><strong>Valida</strong> se os dados estão corretos</li>
+        <li><strong>Processa</strong> e <strong>persiste</strong> em dois lugares ao mesmo tempo (Redis e DynamoDB)</li>
+        <li><strong>Notifica</strong> uma interface web em tempo real</li>
+        <li><strong>Lida com falhas</strong> — retenta operações que falham e isola mensagens que não podem ser processadas</li>
+      </ol>
+
+      <p>Tudo isso usando tecnologias que você vai encontrar em sistemas reais: Apache Kafka, Redis, DynamoDB e OpenTelemetry.</p>
+
+      <h3>Stack tecnológica</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Componente</th><th>O que faz</th><th>Biblioteca Go</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Apache Kafka</strong></td>
+              <td>Broker de mensagens — o "correio" do sistema. Produtores publicam mensagens, consumidores as leem.</td>
+              <td><code>github.com/IBM/sarama</code></td>
+            </tr>
+            <tr>
+              <td><strong>Redis</strong></td>
+              <td>Cache rápido — guarda status atual dos pagamentos e controla idempotência (evita processar duplicado).</td>
+              <td><code>github.com/redis/go-redis/v9</code></td>
+            </tr>
+            <tr>
+              <td><strong>DynamoDB</strong></td>
+              <td>Banco NoSQL persistente — guarda o histórico completo de cada pagamento.</td>
+              <td><code>github.com/aws/aws-sdk-go-v2</code></td>
+            </tr>
+            <tr>
+              <td><strong>OpenTelemetry</strong></td>
+              <td>Observabilidade — tracing distribuído, métricas e logs estruturados.</td>
+              <td><code>go.opentelemetry.io/otel</code></td>
+            </tr>
+            <tr>
+              <td><strong>Go 1.26</strong></td>
+              <td>Linguagem principal. Tudo é escrito em Go idiomático.</td>
+              <td>—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Os 3 serviços</h3>
+      <p>O GoPayground roda <strong>3 serviços independentes</strong>, cada um em um processo separado:</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Serviço</th><th>Diretório</th><th>Porta</th><th>Função</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Consumer</strong></td><td><code>cmd/consumer</code></td><td><code>8080</code></td><td>Processa eventos do Kafka, valida, persiste</td></tr>
+            <tr><td><strong>UI</strong></td><td><code>cmd/ui</code></td><td><code>8081</code></td><td>Interface web — dashboards, SSE, API REST</td></tr>
+            <tr><td><strong>Producer</strong></td><td><code>cmd/producer</code></td><td><code>8082</code></td><td>Publica eventos no Kafka (CLI ou HTTP)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- ===== ARQUITETURA ===== -->
+    <section id="arquitetura">
+      <h2>🏗️ Arquitetura em 5 minutos</h2>
+      <p>A arquitetura segue o padrão <strong>Event-Driven</strong> (orientada a eventos). Isso significa que os serviços não se chamam diretamente — eles se comunicam através de mensagens no Kafka.</p>
+
+      <div class="diagram-wrap">
+        <div class="lang-label">Arquitetura GoPayground</div>
+        <pre>
+ <span class="dim">┌─────────────────────────────────────────────────────────────────────┐</span>
+ <span class="dim">│</span>                         <span class="hl">KAFKA CLUSTER</span>                          <span class="dim">│</span>
+ <span class="dim">│</span>                                                                      <span class="dim">│</span>
+ <span class="dim">│</span>  <span class="dim">┌──────────────────────────────┐</span>    <span class="dim">┌─────────────────────────┐</span>    <span class="dim">│</span>
+ <span class="dim">│</span>  <span class="dim">│</span>   <span class="blue">payment.events (3 parts)</span>   <span class="dim">│</span>    <span class="dim">│</span> <span class="blue">payment.events.dlq (1)</span>  <span class="dim">│</span>    <span class="dim">│</span>
+ <span class="dim">│</span>  <span class="dim">│</span>   <span class="dim">topico principal</span>              <span class="dim">│</span>    <span class="dim">│</span> <span class="dim">Dead Letter Queue</span>       <span class="dim">│</span>    <span class="dim">│</span>
+ <span class="dim">│</span>  <span class="dim">└────────┬─────────────────────┘</span>    <span class="dim">└────────────▲────────────┘</span>    <span class="dim">│</span>
+ <span class="dim">│</span>           <span class="dim">│</span>                                       <span class="dim">│</span>                 <span class="dim">│</span>
+ <span class="dim">└───────────│───────────────────────────────────────│─────────────────┘</span>
+             <span class="dim">│</span>                                       <span class="dim">│</span>
+     <span class="dim">┌───────┴──────────────┐</span>              <span class="dim">┌─────────┴──────────┐</span>
+     <span class="dim">│</span>    <span class="hl">PRODUCER (:8082)</span>   <span class="dim">│</span>              <span class="dim">│</span>  <span class="hl">CONSUMER (:8080)</span>   <span class="dim">│</span>
+     <span class="dim">│</span>  <span class="dim">┌─────────────────┐</span> <span class="dim">│</span>              <span class="dim">│</span>  <span class="dim">┌──────────────┐</span>  <span class="dim">│</span>
+     <span class="dim">│</span>  <span class="dim">│ CLI (publish)   │</span> <span class="dim">│</span>              <span class="dim">│</span>  <span class="dim">│</span> <span class="green">1. Validate</span>  <span class="dim">│</span>  <span class="dim">│</span>
+     <span class="dim">│</span>  <span class="dim">│ HTTP (serve)    │</span><span class="dim">─┼</span>──publica─────<span class="dim">─┼─▶│</span> <span class="green">2. Idempot.</span>  <span class="dim">│</span>  <span class="dim">│</span>
+     <span class="dim">│</span>  <span class="dim">└─────────────────┘</span> <span class="dim">│</span>              <span class="dim">│</span>  <span class="dim">│</span> <span class="green">3. Status</span>    <span class="dim">│</span>  <span class="dim">│</span>
+     <span class="dim">└──────────────────────┘</span>              <span class="dim">│</span>  <span class="dim">│</span> <span class="green">4. History</span>   <span class="dim">│</span>  <span class="dim">│</span>
+                                           <span class="dim">│</span>  <span class="dim">│</span> <span class="green">5. Retry/DLQ</span><span class="dim"> │</span>  <span class="dim">│</span>
+                                           <span class="dim">│</span>  <span class="dim">└───┬────┬────┘</span>  <span class="dim">│</span>
+                                           <span class="dim">└──────│────│───────┘</span>
+                                                  <span class="dim">│</span>    <span class="dim">│</span>
+                              <span class="dim">┌───────────┼────┼───────────┐</span>
+                              <span class="dim">│</span>           <span class="dim">│</span>    <span class="dim">│</span>           <span class="dim">│</span>
+                              <span class="dim">│</span>           <span class="blue">▼</span>    <span class="blue">▼</span>           <span class="dim">│</span>
+                              <span class="dim">│</span>     <span class="dim">┌──────────┐</span> <span class="dim">┌──────────┐</span>    <span class="dim">│</span>
+                              <span class="dim">│</span>     <span class="dim">│</span>  <span class="hl">REDIS</span>   <span class="dim">│</span> <span class="dim">│</span> <span class="hl">DYNAMODB</span> <span class="dim">│</span>    <span class="dim">│</span>
+                              <span class="dim">│</span>     <span class="dim">│</span> <span class="dim">- status</span>  <span class="dim">│</span> <span class="dim">│</span> <span class="dim">- history</span><span class="dim"> │</span>    <span class="dim">│</span>
+                              <span class="dim">│</span>     <span class="dim">│</span> <span class="dim">- idemp.</span>  <span class="dim">│</span> <span class="dim">│</span>          <span class="dim">│</span>    <span class="dim">│</span>
+                              <span class="dim">│</span>     <span class="dim">└─────┬────┘</span> <span class="dim">└──────────┘</span>    <span class="dim">│</span>
+                              <span class="dim">│</span>           <span class="dim">│</span>                         <span class="dim">│</span>
+                              <span class="dim">│</span>  <span class="dim">EventBus</span>    <span class="dim">│</span>                         <span class="dim">│</span>
+                              <span class="dim">│</span>  <span class="dim">(Redis Pub/Sub)</span><span class="dim">│</span>                         <span class="dim">│</span>
+                              <span class="dim">│</span>           <span class="blue">▼</span>                         <span class="dim">│</span>
+                              <span class="dim">│</span>     <span class="dim">┌──────────┐</span>                    <span class="dim">│</span>
+                              <span class="dim">│</span>     <span class="dim">│</span>  <span class="hl">UI (:8081)</span> <span class="dim">│</span>                   <span class="dim">│</span>
+                              <span class="dim">│</span>     <span class="dim">│</span> <span class="dim">- SSE</span>     <span class="dim">│</span>                   <span class="dim">│</span>
+                              <span class="dim">│</span>     <span class="dim">│</span> <span class="dim">- REST</span>    <span class="dim">│</span>                   <span class="dim">│</span>
+                              <span class="dim">│</span>     <span class="dim">│</span> <span class="dim">- Dashboard</span> <span class="dim">│</span>                  <span class="dim">│</span>
+                              <span class="dim">│</span>     <span class="dim">└──────────┘</span>                    <span class="dim">│</span>
+                              <span class="dim">└──────────────────────────────────────┘</span>
+ <span class="dim">┌────────────────────────────────────────────────────────────────────┐</span>
+ <span class="dim">│</span>                        <span class="hl">OBSERVABILIDADE</span>                           <span class="dim">│</span>
+ <span class="dim">│</span>  <span class="green">OpenTelemetry Collector → Tracing (Jaeger) → Metrics (Prom)</span>   <span class="dim">│</span>
+ <span class="dim">│</span>  <span class="dim">Logs estruturados (slog + JSON)</span>                              <span class="dim">│</span>
+ <span class="dim">└────────────────────────────────────────────────────────────────────┘</span>
+        </pre>
+      </div>
+
+      <h3>Como os serviços se conectam</h3>
+      <ol>
+        <li><strong>Producer → Kafka</strong>: o producer publica mensagens no tópico <code>payment.events</code></li>
+        <li><strong>Kafka → Consumer</strong>: o consumer lê do tópico em um <strong>consumer group</strong></li>
+        <li><strong>Consumer → Redis</strong>: atualiza status do pagamento e marca idempotência</li>
+        <li><strong>Consumer → DynamoDB</strong>: salva o histórico completo</li>
+        <li><strong>Consumer → Redis Pub/Sub</strong>: publica evento no EventBus</li>
+        <li><strong>EventBus → UI → Browser</strong>: a UI recebe do Redis Pub/Sub e envia via <strong>SSE</strong> para o navegador</li>
+        <li><strong>UI → Producer → Kafka</strong>: quando você publica um evento pela interface web, a UI faz um HTTP POST para o producer, que publica no Kafka</li>
+      </ol>
+
+      <div class="callout callout-warn">
+        <strong>⚠️ Importante:</strong> O Producer é a <strong>única</strong> porta de entrada para o Kafka. Nem a UI nem o Consumer publicam diretamente no Kafka (exceto o DLQ, que é uma exceção controlada).
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- ===== FLUXO DE UM PAGAMENTO ===== -->
+    <section id="fluxo-pagamento">
+      <h2>⚡ Fluxo de um pagamento (passo a passo)</h2>
+      <p>Vamos acompanhar um evento de pagamento do começo ao fim:</p>
+
+      <div class="step-list">
+
+        <div class="step-item">
+          <h4>Alguém publica um evento</h4>
+          <p>Um evento de pagamento pode ser publicado de três formas:</p>
+          <p><strong>a) Pela interface web (mais comum para testes):</strong></p>
+          <pre>Você → http://localhost:8081 (UI) → POST /api/publish → Producer HTTP (8082) → Kafka</pre>
+          <p><strong>b) Pela CLI do producer:</strong></p>
+          <pre><span class="hljs-built_in">go run</span> ./cmd/producer publish <span class="hljs-attr">--amount</span> <span class="hljs-number">150.00</span> <span class="hljs-attr">--currency</span> BRL <span class="hljs-attr">--status</span> confirmed</pre>
+          <p><strong>c) Via curl diretamente no producer:</strong></p>
+          <pre><span class="hljs-built_in">curl</span> -X POST http://localhost:8082/publish \
+  -H <span class="hljs-string">"Content-Type: application/json"</span> \
+  -d <span class="hljs-string">'{"amount":150,"currency":"BRL","status":"confirmed"}'</span></pre>
+        </div>
+
+        <div class="step-item">
+          <h4>O evento chega no Kafka</h4>
+          <p>O producer usa o <strong>Sarama SyncProducer</strong> para publicar a mensagem no tópico <code>payment.events</code>. O Kafka armazena a mensagem em uma das 3 partições do tópico. A partição é escolhida pelo <code>payment_id</code> — assim, todo evento com o mesmo <code>payment_id</code> vai para a mesma partição (garantindo ordenação).</p>
+        </div>
+
+        <div class="step-item">
+          <h4>O Consumer recebe a mensagem</h4>
+          <p>O Consumer escuta o tópico <code>payment.events</code> usando o consumer group <code>payment-consumer-group</code>. Quando uma mensagem chega, o Consumer:</p>
+          <p><strong>a) Adquire um slot do worker pool</strong><br>
+          O Consumer tem um semáforo que limita quantas mensagens podem ser processadas simultaneamente (padrão: 10 workers). Se todos os slots estiverem ocupados, a mensagem espera.</p>
+          <p><strong>b) Valida o payload</strong><br>
+          Usa a biblioteca <code>go-playground/validator</code> para conferir se:</p>
+          <ul>
+            <li><code>payment_id</code> é um UUID v4 válido</li>
+            <li><code>status</code> é um dos valores permitidos (pending, confirmed, failed, refunded)</li>
+            <li><code>amount</code> é maior que zero</li>
+            <li><code>currency</code> tem 3 letras maiúsculas (ISO 4217)</li>
+          </ul>
+          <p>Se a validação falhar → a mensagem vai direto para a <strong>DLQ</strong> (Dead Letter Queue), sem tentar novamente.</p>
+          <p><strong>c) Verifica idempotência</strong><br>
+          Antes de processar, o Consumer pergunta ao Redis: "este <code>payment_id</code> já foi processado?". Se sim, a mensagem é ignorada (commit sem ação). Se não, marca no Redis com <code>SET NX</code> e TTL de 24h.</p>
+          <div class="callout callout-info">
+            <strong>💡 Isso garante que mesmo que o Kafka entregue a mesma mensagem duas vezes</strong> (comportamento padrão "at-least-once"), ela só será processada uma vez.
+          </div>
+          <p><strong>d) Processa com retry</strong><br>
+          Tenta executar duas operações:</p>
+          <ol>
+            <li>Atualizar o status no Redis (chave <code>payment:&lt;id&gt;</code>, TTL 7 dias)</li>
+            <li>Salvar o histórico no DynamoDB (tabela <code>payment_history</code>)</li>
+          </ol>
+          <p>Se alguma falhar (ex: Redis fora do ar), o retry tenta novamente com backoff exponencial: 100ms → 300ms → 900ms (3 tentativas no total).</p>
+          <p><strong>e) Se o retry esgotar → DLQ</strong><br>
+          Após 3 tentativas falhas, a mensagem vai para o tópico <code>payment.events.dlq</code> com headers que preservam o erro original, o número de tentativas e o <code>trace_id</code> para debugging.</p>
+          <p><strong>f) Publica no EventBus</strong><br>
+          Se tudo der certo, o Consumer publica o evento no canal <code>payment:events</code> do Redis Pub/Sub. A UI está escutando esse canal.</p>
+        </div>
+
+        <div class="step-item">
+          <h4>A UI recebe e mostra</h4>
+          <p>A UI mantém uma conexão <strong>SSE</strong> (Server-Sent Events) com cada navegador conectado. Quando um evento chega pelo Redis Pub/Sub:</p>
+          <ol>
+            <li>O <code>EventBus</code> da UI recebe a mensagem do Redis</li>
+            <li>Distribui para todos os subscribers (cada aba do navegador)</li>
+            <li>O handler SSE escreve no HTTP response: <code>event: payment\ndata: {...}\n\n</code></li>
+            <li>O JavaScript do navegador escuta <code>eventSource.addEventListener('payment', ...)</code> e atualiza a tela em tempo real</li>
+          </ol>
+        </div>
+
+        <div class="step-item">
+          <h4>Você consulta</h4>
+          <p>Além do feed em tempo real, a UI oferece endpoints REST para consultar:</p>
+          <ul>
+            <li><code>GET /api/payments</code> — lista pagamentos no Redis (com filtros)</li>
+            <li><code>GET /api/payments/{id}/history</code> — histórico completo no DynamoDB</li>
+            <li><code>GET /api/metrics</code> — métricas agregadas (total, por status, taxa de sucesso)</li>
+          </ul>
+        </div>
+
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- ===== PRIMEIROS PASSOS ===== -->
+    <section id="primeiros-passos">
+      <h2>🚀 Primeiros passos</h2>
+
+      <h3>Pré-requisitos</h3>
+      <ul>
+        <li><strong>Go 1.26+</strong> — <a href="https://go.dev/dl/" target="_blank" rel="noopener">instalar</a></li>
+        <li><strong>Docker + Docker Compose</strong> — <a href="https://docs.docker.com/compose/install/" target="_blank" rel="noopener">instalar</a></li>
+        <li><strong>Git</strong> — para clonar o repositório</li>
+      </ul>
+
+      <h3>Setup rápido</h3>
+      <pre class="has-header"><span class="lang-label">bash</span><span class="hljs-comment"># 1. Clone o repositório</span>
+git clone https://github.com/Daniel-Dos/gopayground.git
+<span class="hljs-built_in">cd</span> gopayground
+
+<span class="hljs-comment"># 2. Inicie a infraestrutura (Kafka, Redis, DynamoDB, OTel)</span>
+make docker-up
+<span class="hljs-comment"># Equivalente a: docker compose up -d</span>
+
+<span class="hljs-comment"># 3. Aguarde os serviços subirem (cerca de 30s)</span>
+docker compose ps
+
+<span class="hljs-comment"># 4. Em um terminal, inicie o Consumer</span>
+make run
+
+<span class="hljs-comment"># 5. Em outro terminal, inicie a UI</span>
+make run-ui
+
+<span class="hljs-comment"># 6. Em outro terminal, inicie o Producer em modo servidor HTTP</span>
+make run-producer-serve
+
+<span class="hljs-comment"># 7. Abra o navegador em http://localhost:8081</span></pre>
+
+      <h3>Comandos essenciais (Makefile)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Comando</th><th>O que faz</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>make test</code></td><td>Roda todos os testes com race detector</td></tr>
+            <tr><td><code>make lint</code></td><td>Executa golangci-lint</td></tr>
+            <tr><td><code>make build</code></td><td>Compila o consumer</td></tr>
+            <tr><td><code>make build-ui</code></td><td>Compila a UI (copia docs para embed)</td></tr>
+            <tr><td><code>make build-producer</code></td><td>Compila o producer</td></tr>
+            <tr><td><code>make run</code></td><td>Sobe o consumer localmente</td></tr>
+            <tr><td><code>make run-ui</code></td><td>Sobe a UI localmente</td></tr>
+            <tr><td><code>make run-producer</code></td><td>Executa o producer no modo CLI (publish)</td></tr>
+            <tr><td><code>make run-producer-serve</code></td><td>Sobe o producer como servidor HTTP</td></tr>
+            <tr><td><code>make docker-up</code></td><td>Sobe todos os serviços Docker (infra + apps)</td></tr>
+            <tr><td><code>make docker-down</code></td><td>Derruba todos os serviços Docker</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Publicando seu primeiro evento</h3>
+      <p>Com tudo rodando, abra o navegador em <code>http://localhost:8081</code> e:</p>
+      <ol>
+        <li>Acesse a página <strong>Producer</strong> (<code>/producer</code>)</li>
+        <li>Preencha valor, moeda e clique em "Publish"</li>
+        <li>Veja o evento aparecer em tempo real no dashboard</li>
+      </ol>
+
+      <p>Ou via terminal:</p>
+      <pre class="has-header"><span class="lang-label">bash</span><span class="hljs-comment"># Publicar um evento via curl na UI</span>
+curl -X POST http://localhost:8081/api/publish \
+  -H <span class="hljs-string">"Content-Type: application/json"</span> \
+  -d <span class="hljs-string">'{"amount": 250.00, "currency": "BRL", "status": "confirmed", "description": "Pedido #67890"}'</span>
+
+<span class="hljs-comment"># Publicar 10 eventos aleatórios</span>
+curl -X POST http://localhost:8081/api/publish/bulk \
+  -H <span class="hljs-string">"Content-Type: application/json"</span> \
+  -d <span class="hljs-string">'{"count": 10}'</span>
+
+<span class="hljs-comment"># Ver métricas</span>
+curl http://localhost:8081/api/metrics
+
+<span class="hljs-comment"># Ver o stream SSE (deixe rodando)</span>
+curl -N http://localhost:8081/api/events</pre>
+
+      <h3>Encerrando</h3>
+      <pre class="has-header"><span class="lang-label">bash</span><span class="hljs-comment"># Ctrl+C em cada terminal para parar os serviços Go</span>
+<span class="hljs-comment"># Depois, pare a infraestrutura:</span>
+make docker-down</pre>
+    </section>
+
+    <hr>
+
+    <!-- ===== ESTRUTURA DO CÓDIGO ===== -->
+    <section id="estrutura-codigo">
+      <h2>📁 Estrutura do código</h2>
+
+      <div class="diagram-wrap">
+        <div class="lang-label">Diretórios</div>
+        <pre>
+ <span class="hl">.</span>
+ ├── <span class="hl">cmd/</span>                        <span class="dim"># Entrypoints (main de cada serviço)</span>
+ │   ├── <span class="blue">consumer/main.go</span>        <span class="dim"># Consumer: inicia Kafka + workers</span>
+ │   ├── <span class="blue">producer/main.go</span>        <span class="dim"># Producer: CLI + HTTP server</span>
+ │   └── <span class="blue">ui/main.go</span>              <span class="dim"># UI: servidor web</span>
+ │
+ ├── <span class="hl">internal/</span>                   <span class="dim"># Código interno (não importável externamente)</span>
+ │   ├── <span class="blue">config/config.go</span>        <span class="dim"># Config via Viper (YAML + env vars)</span>
+ │   ├── <span class="blue">consumer/handler.go</span>     <span class="dim"># Lógica central de processamento</span>
+ │   ├── <span class="blue">models/payment.go</span>       <span class="dim"># PaymentEvent, PaymentStatus, PaymentHistory</span>
+ │   ├── <span class="blue">validator/validator.go</span>  <span class="dim"># Validação de payload</span>
+ │   ├── <span class="blue">idempotency/redis.go</span>    <span class="dim"># Idempotência via Redis SET NX</span>
+ │   ├── <span class="blue">status/redis.go</span>         <span class="dim"># Status updater (Redis HSET)</span>
+ │   ├── <span class="blue">history/dynamodb.go</span>     <span class="dim"># Histórico no DynamoDB</span>
+ │   ├── <span class="blue">retry/handler.go</span>        <span class="dim"># Retry com backoff exponencial</span>
+ │   ├── <span class="blue">dlq/producer.go</span>         <span class="dim"># Dead Letter Queue (publica no Kafka)</span>
+ │   ├── <span class="blue">events/</span>                  <span class="dim"># EventPublisher (Redis Pub/Sub)</span>
+ │   │   ├── <span class="blue">publisher.go</span>        <span class="dim"># Interface Publisher</span>
+ │   │   └── <span class="blue">redis_publisher.go</span>  <span class="dim"># Implementação Redis</span>
+ │   ├── <span class="blue">kafka/provider.go</span>       <span class="dim"># Configuração Sarama (consumer + producer)</span>
+ │   ├── <span class="blue">provider/</span>               <span class="dim"># Clients centralizados</span>
+ │   │   ├── <span class="blue">redis.go</span>           <span class="dim"># Factory do Redis client</span>
+ │   │   └── <span class="blue">dynamodb.go</span>        <span class="dim"># Factory do DynamoDB client</span>
+ │   ├── <span class="blue">producer/producer.go</span>    <span class="dim"># Lógica de publicação reusada</span>
+ │   └── <span class="blue">ui/</span>                     <span class="dim"># Servidor web</span>
+ │       ├── <span class="blue">server.go</span>          <span class="dim"># Setup do HTTP server + middlewares</span>
+ │       ├── <span class="blue">handlers.go</span>        <span class="dim"># Handlers REST + SSE</span>
+ │       ├── <span class="blue">events.go</span>          <span class="dim"># EventBus (Redis Pub/Sub subscriber)</span>
+ │       └── <span class="blue">static/</span>            <span class="dim"># Frontend (HTML, CSS, JS embutidos)</span>
+ │           ├── <span class="blue">index.html</span>       <span class="dim"># Dashboard principal</span>
+ │           ├── <span class="blue">dashboard.html</span>   <span class="dim"># Dashboard gráfico</span>
+ │           ├── <span class="blue">producer.html</span>    <span class="dim"># Página de publicação manual</span>
+ │           ├── <span class="blue">app.js</span>          <span class="dim"># JavaScript principal</span>
+ │           └── <span class="blue">styles.css</span>      <span class="dim"># Estilos</span>
+ │
+ ├── <span class="hl">pkg/</span>                        <span class="dim"># Pacotes potencialmente reutilizáveis</span>
+ │   ├── <span class="blue">telemetry/telemetry.go</span>  <span class="dim"># OpenTelemetry (tracer + meter provider)</span>
+ │   └── <span class="blue">model/user.go</span>           <span class="dim"># Modelo User (não utilizado atualmente)</span>
+ │
+ ├── <span class="hl">specs/</span>                      <span class="dim"># Especificações SDD das features</span>
+ │   ├── <span class="blue">0001-kafka-payment-consumer/</span>  <span class="dim"># Spec do Consumer</span>
+ │   ├── <span class="blue">0002-payment-ui/</span>              <span class="dim"># Spec da UI</span>
+ │   └── <span class="blue">0003-cli-producer/</span>            <span class="dim"># Spec do Producer</span>
+ │
+ ├── <span class="hl">adrs/</span>                       <span class="dim"># Architecture Decision Records (13 ADRs)</span>
+ │   ├── <span class="blue">ADR-001-kafka-message-broker.md</span>
+ │   ├── <span class="blue">ADR-009-worker-pool-concurrency.md</span>
+ │   └── <span class="dim">... (veja lista completa no README)</span>
+ │
+ ├── <span class="hl">docs/</span>                       <span class="dim"># Documentação</span>
+ │   ├── <span class="blue">architecture.md</span>         <span class="dim"># Arquitetura detalhada</span>
+ │   ├── <span class="blue">onboarding.md</span>           <span class="dim"># Este arquivo</span>
+ │   ├── <span class="blue">ui.md</span>                   <span class="dim"># Documentação da UI</span>
+ │   ├── <span class="blue">producer.md</span>             <span class="dim"># Documentação do Producer</span>
+ │   ├── <span class="blue">observability.md</span>        <span class="dim"># Stack OTel</span>
+ │   ├── <span class="blue">setup.md</span>                <span class="dim"># Guia de setup</span>
+ │   ├── <span class="blue">features/</span>               <span class="dim"># Docs das features</span>
+ │   └── <span class="blue">diagrams/</span>               <span class="dim"># Diagramas (JPG + .excalidraw)</span>
+ │
+ ├── <span class="blue">config.yaml</span>                 <span class="dim"># Configuração central</span>
+ ├── <span class="blue">docker-compose.yml</span>          <span class="dim"># Stack completa</span>
+ ├── <span class="blue">Makefile</span>                    <span class="dim"># Comandos de build/test/run</span>
+ ├── <span class="blue">go.mod / go.sum</span>             <span class="dim"># Dependências Go</span>
+ └── <span class="blue">AGENTS.md</span>                   <span class="dim"># Instruções para agentes de IA</span>
+        </pre>
+      </div>
+
+      <h3>Tour guiado pelos diretórios</h3>
+
+      <div class="card-grid">
+        <div class="card">
+          <h4><code>cmd/</code></h4>
+          <p>Cada subdiretório tem um <code>main.go</code> que é o ponto de entrada de um binário independente. É aqui que as dependências são "coladas": config, Redis, DynamoDB, Kafka, etc.</p>
+        </div>
+        <div class="card">
+          <h4><code>internal/</code></h4>
+          <p>Código do domínio, organizado por responsabilidade. A convenção Go é que pacotes em <code>internal/</code> só podem ser importados por código dentro do módulo — ninguém de fora consegue importar.</p>
+        </div>
+        <div class="card">
+          <h4><code>specs/</code></h4>
+          <p>Especificações no formato SDD (Spec Driven Development). Cada feature tem uma pasta com 7 arquivos: contexto, requisitos, design, plano de implementação, checklist de validação, riscos e hardening.</p>
+        </div>
+        <div class="card">
+          <h4><code>adrs/</code></h4>
+          <p>Decision Records. Cada ADR documenta uma decisão arquitetural importante: por que escolhemos Kafka em vez de RabbitMQ, por que usamos SSE em vez de WebSocket, etc.</p>
+        </div>
+        <div class="card">
+          <h4><code>docs/</code></h4>
+          <p>Documentação em Markdown. Complementa o README com detalhes sobre arquitetura, setup, UI e producer.</p>
+        </div>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- ===== COMO CONTRIBUIR ===== -->
+    <section id="como-contribuir">
+      <h2>🤝 Como contribuir (fluxo SDD)</h2>
+      <p>O GoPayground segue <strong>Spec Driven Development (SDD)</strong>. Toda feature ou mudança significativa segue um fluxo rigoroso em etapas, cada uma executada por um papel específico.</p>
+
+      <h3>Ciclo de vida de uma feature</h3>
+
+      <div class="diagram-wrap">
+        <div class="lang-label">SDD Flow</div>
+        <pre>
+ <span class="green">1. Architect</span>
+    <span class="dim">↓  Cria a spec em /specs/&lt;id-feature&gt;/</span>
+ <span class="green">2. Senior Engineer</span>
+    <span class="dim">↓  Implementa o código seguindo a spec</span>
+ <span class="green">3. AI Engineering</span> <span class="dim">(se aplicável)</span>
+    <span class="dim">↓  Implementa pipelines de IA</span>
+ <span class="green">4. Hardening Engineer</span>
+    <span class="dim">↓  Valida resiliência, concorrência, segurança</span>
+ <span class="green">5. Reviewer</span>
+    <span class="dim">↓  Revisa aderência à spec e qualidade</span>
+ <span class="green">6. Technical Writer</span>
+    <span class="dim">↓  Documenta o que foi construído</span>
+ <span class="green">7. Docker Specialist</span>
+    <span class="dim">↓  Cria/mantém Dockerfiles e docker-compose</span>
+ <span class="green">8. GitHub Specialist</span>
+    <span class="dim">↓  Configura CI/CD, PRs, releases</span>
+ <span class="green">9. Frontend Engineer</span> <span class="dim">(se aplicável)</span>
+    <span class="dim">↓  Interfaces web</span>
+ <span class="green">10. Dashboard &amp; Report Specialist</span> <span class="dim">(se aplicável)</span>
+    <span class="dim">↓  Relatórios HTML, métricas</span>
+        </pre>
+      </div>
+
+      <h3>Estrutura de uma spec</h3>
+      <p>Cada feature tem uma pasta numerada em <code>specs/</code>:</p>
+      <pre class="has-header"><span class="lang-label">text</span>specs/0003-cli-producer/
+├── <span class="hljs-number">01</span>-context.md               <span class="hljs-comment"># Contexto de negócio e problema</span>
+├── <span class="hljs-number">02</span>-requirements.md          <span class="hljs-comment"># Requisitos funcionais e não-funcionais</span>
+├── <span class="hljs-number">03</span>-design.md                <span class="hljs-comment"># Design da solução</span>
+├── <span class="hljs-number">04</span>-implementation-plan.md  <span class="hljs-comment"># Plano de implementação</span>
+├── <span class="hljs-number">05</span>-validation-checklist.md <span class="hljs-comment"># Checklist de validação</span>
+├── <span class="hljs-number">06</span>-risks-tradeoffs.md      <span class="hljs-comment"># Riscos e tradeoffs</span>
+└── <span class="hljs-number">07</span>-hardening.md            <span class="hljs-comment"># Considerações de segurança</span></pre>
+
+      <h3>Como criar uma nova feature</h3>
+      <ol>
+        <li>Crie uma pasta em <code>specs/</code> com o próximo número disponível</li>
+        <li>Escreva os arquivos de spec (começando pelo contexto)</li>
+        <li>Suba um PR com a spec para revisão do Architect</li>
+        <li>Após aprovação, a implementação segue o fluxo SDD</li>
+      </ol>
+
+      <h3>Convenções de código</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Convenção</th><th>Descrição</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Idiomático Go</strong></td><td>interfaces pequenas, composição, erros com <code>fmt.Errorf("%w", err)</code></td></tr>
+            <tr><td><strong>Context.Context</strong></td><td>obrigatório em operações bloqueantes (Redis, DynamoDB, Kafka)</td></tr>
+            <tr><td><strong>Testes table-driven</strong></td><td>testes com subtests (<code>t.Run</code>) e cenários em tabela</td></tr>
+            <tr><td><strong>Race detector</strong></td><td>todos os testes rodam com <code>-race</code></td></tr>
+            <tr><td><strong>Logs estruturados</strong></td><td>usar <code>log/slog</code> com atributos, não <code>fmt.Println</code></td></tr>
+            <tr><td><strong>Simplicidade primeiro</strong></td><td>preferir solução simples sobre complexa</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- ===== GLOSSÁRIO ===== -->
+    <section id="glossario">
+      <h2>📖 Glossário</h2>
+
+      <h3>Kafka</h3>
+      <div class="glossary-term">
+        <h4>Topic (tópico)</h4>
+        <p>Um canal nomeado onde mensagens são publicadas. O GoPayground tem dois tópicos: <code>payment.events</code> (principal) e <code>payment.events.dlq</code> (Dead Letter Queue).</p>
+      </div>
+      <div class="glossary-term">
+        <h4>Partition (partição)</h4>
+        <p>Uma divisão do tópico. Mensagens com a mesma chave vão para a mesma partição, garantindo ordenação. O tópico <code>payment.events</code> tem 3 partições.</p>
+      </div>
+      <div class="glossary-term">
+        <h4>Consumer Group</h4>
+        <p>Um grupo de consumidores que divide o trabalho de ler um tópico. Cada partição é atribuída a um consumidor do grupo. O grupo do GoPayground é <code>payment-consumer-group</code>.</p>
+      </div>
+      <div class="glossary-term">
+        <h4>Offset</h4>
+        <p>Um número sequencial que identifica a posição de uma mensagem dentro de uma partição. O Kafka mantém qual offset cada consumer group já processou.</p>
+      </div>
+      <div class="glossary-term">
+        <h4>At-least-once</h4>
+        <p>Garantia de entrega — a mensagem é entregue pelo menos uma vez, mas pode ser entregue mais de uma vez. Por isso precisamos de idempotência.</p>
+      </div>
+      <div class="glossary-term">
+        <h4>SyncProducer</h4>
+        <p>Produtor que espera a confirmação do Kafka antes de retornar. Mais lento mas mais seguro que o AsyncProducer.</p>
+      </div>
+
+      <h3>DLQ (Dead Letter Queue)</h3>
+      <div class="glossary-term">
+        <h4>DLQ</h4>
+        <p>Um tópico separado para mensagens que não puderam ser processadas. No GoPayground, vai para a DLQ: (1) payload inválido (falha imediata) ou (2) retry exaustado (falha após 3 tentativas).</p>
+      </div>
+      <div class="glossary-term">
+        <h4>Headers DLQ</h4>
+        <p>Metadados preservados na mensagem da DLQ — <code>original_topic</code>, <code>original_partition</code>, <code>original_offset</code>, <code>last_error</code>, <code>trace_id</code>.</p>
+      </div>
+
+      <h3>SSE (Server-Sent Events)</h3>
+      <div class="glossary-term">
+        <h4>SSE</h4>
+        <p>Tecnologia que permite ao servidor enviar eventos para o navegador em tempo real, usando uma conexão HTTP contínua. Diferente de WebSocket, SSE é unidirecional (servidor → cliente).</p>
+      </div>
+      <div class="glossary-term">
+        <h4>EventSource</h4>
+        <p>API JavaScript nativa dos navegadores para consumir SSE. Reconecta automaticamente em caso de queda.</p>
+      </div>
+      <div class="glossary-term">
+        <h4>Heartbeat</h4>
+        <p>Mensagem enviada a cada 30s para manter a conexão viva.</p>
+      </div>
+
+      <h3>Idempotência</h3>
+      <div class="glossary-term">
+        <h4>Idempotência</h4>
+        <p>Propriedade que garante que processar a mesma mensagem duas vezes produz o mesmo resultado que processar uma vez. No GoPayground, usamos Redis com <code>SET NX</code> (set if not exists) e TTL de 24h.</p>
+      </div>
+      <div class="glossary-term">
+        <h4>SET NX</h4>
+        <p>Comando Redis que só define uma chave se ela não existir. Perfeito para controle de concorrência.</p>
+      </div>
+
+      <h3>Redis</h3>
+      <div class="glossary-term">
+        <h4>Pub/Sub</h4>
+        <p>Padrão publish/subscribe do Redis. Um publisher envia mensagem para um canal, e todos os subscribers desse canal recebem.</p>
+      </div>
+      <div class="glossary-term">
+        <h4>HSET</h4>
+        <p>Comando Redis para definir campos em um hash. Usado para guardar status do pagamento: <code>payment:&lt;id&gt;</code> com campos <code>status</code> e <code>updated_at</code>.</p>
+      </div>
+      <div class="glossary-term">
+        <h4>TTL (Time To Live)</h4>
+        <p>Tempo de vida de uma chave no Redis. Após expirar, a chave é automaticamente removida.</p>
+      </div>
+
+      <h3>DynamoDB</h3>
+      <div class="glossary-term">
+        <h4>Tabela</h4>
+        <p><code>payment_history</code>. Cada registro é um evento de pagamento completo.</p>
+      </div>
+      <div class="glossary-term">
+        <h4>Query</h4>
+        <p>Operação que busca itens pela chave primária (<code>payment_id</code>).</p>
+      </div>
+
+      <h3>Observabilidade</h3>
+      <div class="glossary-term">
+        <h4>OpenTelemetry (OTel)</h4>
+        <p>Framework de observabilidade que unifica tracing, métricas e logs.</p>
+      </div>
+      <div class="glossary-term">
+        <h4>Span</h4>
+        <p>Uma unidade de trabalho no tracing distribuído. Cada mensagem processada gera um span.</p>
+      </div>
+      <div class="glossary-term">
+        <h4>OTLP</h4>
+        <p>Protocolo usado para exportar dados OTel para o Collector.</p>
+      </div>
+      <div class="glossary-term">
+        <h4>Trace ID</h4>
+        <p>Identificador único que correlaciona todos os spans de uma mesma operação.</p>
+      </div>
+
+      <h3>Infraestrutura</h3>
+      <div class="glossary-term">
+        <h4>Docker Compose</h4>
+        <p>Orquestração local. Define todos os serviços (Kafka, Redis, DynamoDB, OTel Collector, Consumer, Producer, UI) em um único arquivo YAML.</p>
+      </div>
+      <div class="glossary-term">
+        <h4>Floci</h4>
+        <p>Substituto local do DynamoDB (compatível com a API AWS).</p>
+      </div>
+      <div class="glossary-term">
+        <h4>OTel Collector</h4>
+        <p>Serviço que recebe dados de telemetria, processa (batch, filtro) e exporta para sistemas como Jaeger e Prometheus.</p>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- ===== ONDE BUSCAR AJUDA ===== -->
+    <section id="onde-buscar-ajuda">
+      <h2>🆘 Onde buscar ajuda</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>O que você precisa</th><th>Onde encontrar</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Como o sistema funciona</td><td><code>docs/architecture.md</code> — arquitetura detalhada</td></tr>
+            <tr><td>Configuração e setup</td><td><code>docs/setup.md</code> — guia de configuração</td></tr>
+            <tr><td>Documentação da UI</td><td><code>docs/ui.md</code> — endpoints, páginas, exemplos curl</td></tr>
+            <tr><td>Documentação do Producer</td><td><code>docs/producer.md</code> — CLI e HTTP</td></tr>
+            <tr><td>Stack de observabilidade</td><td><code>docs/observability.md</code> — OTel, logs, métricas</td></tr>
+            <tr><td>Decisões arquiteturais</td><td><code>adrs/</code> — 13 ADRs documentando cada escolha</td></tr>
+            <tr><td>Specs de features</td><td><code>specs/</code> — especificações completas</td></tr>
+            <tr><td>Diagramas visuais</td><td><code>docs/diagrams/</code> — arquivos .excalidraw e JPG</td></tr>
+            <tr><td>README principal</td><td><code>README.md</code> — visão geral, comandos, estrutura</td></tr>
+            <tr><td>Código-fonte</td><td><code>internal/</code> — cada pacote tem sua responsabilidade</td></tr>
+            <tr><td>Este documento</td><td><code>docs/onboarding.md</code> — visão geral para novos membros</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>ADRs recomendados para começar</h3>
+      <p>Se você quer entender o <em>porquê</em> das decisões, leia estes ADRs primeiro:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>ADR</th><th>Título</th><th>O que explica</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>001</td><td>Apache Kafka como Message Broker</td><td>Por que Kafka?</td></tr>
+            <tr><td>002</td><td>Redis para Idempotência e Status</td><td>Por que Redis para cache?</td></tr>
+            <tr><td>003</td><td>DynamoDB para Histórico</td><td>Por que DynamoDB?</td></tr>
+            <tr><td>004</td><td>Retry Síncrono com Backoff</td><td>Como lidamos com falhas</td></tr>
+            <tr><td>005</td><td>SSE para Streaming</td><td>Como funciona o tempo real</td></tr>
+            <tr><td>009</td><td>Worker Pool com Semáforo</td><td>Controle de concorrência</td></tr>
+            <tr><td>010</td><td>DLQ Estratégia</td><td>O que acontece com falhas</td></tr>
+            <tr><td>013</td><td>UI publica via Producer HTTP</td><td>Por que a UI não publica direto no Kafka</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Dicas finais</h3>
+      <ol>
+        <li><strong>Leia os ADRs</strong> antes de sugerir mudanças arquiteturais — provavelmente a decisão já foi discutida e documentada.</li>
+        <li><strong>Sempre rode os testes</strong> antes de abrir um PR: <code>make test</code>.</li>
+        <li><strong>Use o race detector</strong> — o GoPayground é um sistema concorrente e race conditions podem acontecer.</li>
+        <li><strong>Não tenha medo de perguntar</strong> — todo mundo no time já ficou confuso com Kafka no começo.</li>
+        <li><strong>Acompanhe o fluxo completo</strong>: publique um evento pela UI, veja no dashboard, consulte no Redis e no DynamoDB. Entender o caminho completo é a melhor forma de aprender.</li>
+      </ol>
+
+      <blockquote>Bem-vindo ao time! 🎉</blockquote>
+    </section>
+
+    <!-- FOOTER -->
+    <div class="section-divider">Fim do guia</div>
+    <p style="text-align:center;font-size:.85rem;color:var(--text-muted);margin-top:1rem;">
+      GoPayground &middot; Payment Platform &middot; 
+      <a href="https://github.com/Daniel-Dos/gopayground" target="_blank" rel="noopener">GitHub</a>
+    </p>
+
+  </div>
+</main>
+
+<script>
+(function() {
+  'use strict';
+
+  // Mobile menu toggle
+  var toggle = document.getElementById('menuToggle');
+  var sidebar = document.getElementById('sidebar');
+  var overlay = document.getElementById('sidebarOverlay');
+
+  function openMenu() {
+    sidebar.classList.add('open');
+    overlay.classList.add('open');
+    toggle.setAttribute('aria-expanded', 'true');
+    toggle.innerHTML = '✕';
+  }
+
+  function closeMenu() {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('open');
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.innerHTML = '☰';
+  }
+
+  if (toggle) {
+    toggle.addEventListener('click', function() {
+      if (sidebar.classList.contains('open')) {
+        closeMenu();
+      } else {
+        openMenu();
+      }
+    });
+  }
+  if (overlay) {
+    overlay.addEventListener('click', closeMenu);
+  }
+
+  // Close menu on link click (mobile)
+  var navLinks = sidebar.querySelectorAll('nav a');
+  for (var i = 0; i < navLinks.length; i++) {
+    navLinks[i].addEventListener('click', function() {
+      if (window.innerWidth <= 900) {
+        closeMenu();
+      }
+    });
+  }
+
+  // Active nav highlight on scroll
+  var sections = [];
+  var navAnchors = [];
+  var linkMap = {};
+
+  // Collect all section IDs and nav links
+  for (var j = 0; j < navLinks.length; j++) {
+    var href = navLinks[j].getAttribute('href');
+    if (href && href.charAt(0) === '#') {
+      var id = href.substring(1);
+      var el = document.getElementById(id);
+      if (el) {
+        sections.push(el);
+        navAnchors.push(navLinks[j]);
+        linkMap[id] = navLinks[j];
+      }
+    }
+  }
+
+  var ticking = false;
+  function updateActiveNav() {
+    var scrollY = window.pageYOffset || document.documentElement.scrollTop;
+    var currentId = null;
+
+    // Find the current section
+    for (var k = 0; k < sections.length; k++) {
+      var section = sections[k];
+      var offsetTop = section.offsetTop - 100;
+      var offsetBottom = offsetTop + section.offsetHeight;
+      if (scrollY >= offsetTop && scrollY < offsetBottom) {
+        currentId = section.getAttribute('id');
+        break;
+      }
+    }
+
+    // If none match, pick the last one before scroll position
+    if (!currentId) {
+      for (var m = sections.length - 1; m >= 0; m--) {
+        if (sections[m].offsetTop <= scrollY + 100) {
+          currentId = sections[m].getAttribute('id');
+          break;
+        }
+      }
+    }
+
+    // Update classes
+    for (var n = 0; n < navAnchors.length; n++) {
+      navAnchors[n].classList.remove('active');
+    }
+    if (currentId && linkMap[currentId]) {
+      linkMap[currentId].classList.add('active');
+    }
+  }
+
+  window.addEventListener('scroll', function() {
+    if (!ticking) {
+      window.requestAnimationFrame(function() {
+        updateActiveNav();
+        ticking = false;
+      });
+      ticking = true;
+    }
+  }, { passive: true });
+
+  // Initial update
+  updateActiveNav();
+
+  // Close menu on resize from mobile to desktop
+  window.addEventListener('resize', function() {
+    if (window.innerWidth > 900 && sidebar.classList.contains('open')) {
+      closeMenu();
+    }
+  });
+
+})();
+</script>
+</body>
+</html>
