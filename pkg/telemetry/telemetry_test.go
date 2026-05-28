@@ -18,7 +18,7 @@ func init() {
 
 func TestInitTracerProvider(t *testing.T) {
 	cfg := config.NewConfig()
-	cfg.OTelEndpoint = "localhost:0"
+	cfg.OTel.Endpoint = "localhost:0"
 
 	tp, err := telemetry.InitTracerProvider(context.Background(), cfg)
 	if err != nil {
@@ -32,7 +32,7 @@ func TestInitTracerProvider(t *testing.T) {
 
 func TestInitMeterProvider(t *testing.T) {
 	cfg := config.NewConfig()
-	cfg.OTelEndpoint = "localhost:0"
+	cfg.OTel.Endpoint = "localhost:0"
 
 	mp, err := telemetry.InitMeterProvider(context.Background(), cfg)
 	if err != nil {

@@ -17,9 +17,10 @@
 - [ ] POST `/api/publish` com description > 255 chars retorna 400
 - [ ] POST `/api/publish` com Payment ID vazio gera UUID automaticamente
 - [ ] POST `/api/publish` com Timestamp vazio preenche hora atual
-- [ ] POST `/api/publish` retorna `partition` e `offset` do Kafka
-- [ ] POST `/api/publish` publica também no EventBus (Redis Pub/Sub)
-- [ ] POST `/api/publish` com Kafka indisponível retorna 502
+- [ ] POST `/api/publish` retorna `partition` e `offset` (eco da resposta do Producer)
+- [ ] POST `/api/publish` faz HTTP POST para `producerURL + "/publish"`
+- [ ] POST `/api/publish` com Producer Service offline retorna 502
+- [ ] POST `/api/publish` com Producer retornando erro 400 retorna 400 (eco)
 - [ ] POST `/api/publish` com payload > 100KB retorna 413
 - [ ] POST `/api/publish` respeita rate limit (429 se excedido)
 
@@ -37,7 +38,7 @@
 - [ ] `POST /api/publish` registrada no mux
 - [ ] `POST /api/publish/bulk` registrada no mux
 - [ ] Navegação entre Dashboard e Producer funciona via links
-- [ ] Servidor não falha se Kafka estiver indisponível (apenas log.Warn)
+- [ ] Servidor não falha se Producer Service estiver indisponível (apenas retorna 502 nas rotas de publish)
 
 ## Frontend — Formulário
 
@@ -110,6 +111,8 @@
 ## Docker
 
 - [ ] `docker-compose up` sobe sem erros
-- [ ] Serviço `payment-ui` tem env vars `KAFKA_BROKERS` e `KAFKA_TOPIC`
+- [ ] Serviço `payment-ui` tem env var `UI_PRODUCER_URL=http://producer:8082`
+- [ ] Serviço `payment-ui` **não** tem `KAFKA_BROKERS` ou `KAFKA_TOPIC`
 - [ ] Producer UI acessível em `http://localhost:8081/producer`
-- [ ] Evento publicado via UI aparece na dashboard em tempo real
+- [ ] Evento publicado via UI chega ao Kafka (verificar no consumer/dashboard)
+- [ ] Evento publicado via UI tem header `source: cli-producer` (verificar no consumer)

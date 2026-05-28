@@ -8,7 +8,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// Updater defines the interface for updating payment status.
+// Updater define a interface para atualização de status de pagamento.
 type Updater interface {
 	UpdateStatus(ctx context.Context, paymentID string, status string) error
 }
@@ -18,7 +18,7 @@ type redisUpdater struct {
 	ttl    time.Duration
 }
 
-// NewUpdater creates a new Redis-based status updater.
+// NewUpdater cria um novo atualizador de status baseado em Redis.
 func NewUpdater(client *redis.Client, ttlHours int) Updater {
 	return &redisUpdater{
 		client: client,

@@ -10,7 +10,6 @@ import (
 
 	"github.com/Daniel-Dos/gopayground/internal/config"
 
-	"github.com/IBM/sarama"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/redis/go-redis/v9"
 	"go.opentelemetry.io/otel/attribute"
@@ -21,7 +20,7 @@ import (
 //go:embed static/*
 var staticFiles embed.FS
 
-// Server wraps the HTTP server and its dependencies.
+// Server encapsula o servidor HTTP e suas dependências.
 type Server struct {
 	httpServer *http.Server
 	eventBus   *EventBus
@@ -29,16 +28,16 @@ type Server struct {
 	logger     *slog.Logger
 	meter      metric.Meter
 
-	// Metrics
+	// Métricas OTel para observabilidade da UI
 	httpRequestsTotal   metric.Int64Counter
 	httpRequestDuration metric.Float64Histogram
 }
 
-// NewServer creates a new UI server.
-func NewServer(cfg config.Config, rdb *redis.Client, dynamoClient *dynamodb.Client, kafkaProducer sarama.SyncProducer, logger *slog.Logger, meter metric.Meter) *Server {
-	eventBus := NewEventBus(rdb, "payment:events", cfg.UIEventBusBuffer, logger)
+// NewServer cria um novo servidor UI com todas as dependências.
+func NewServer(cfg config.Config, rdb *redis.Client, dynamoClient *dynamodb.Client, logger *slog.Logger, meter metric.Meter) *Server {
+	eventBus := NewEventBus(rdb, "payment:events", cfg.UI.EventBusBuffer, logger)
 
-	handlers := NewHandlers(rdb, dynamoClient, cfg.DynamoDBTable, eventBus, kafkaProducer, cfg.KafkaTopic, logger)
+	handlers := NewHandlers(rdb, dynamoClient, cfg.DynamoDB.Table, eventBus, cfg.UI.ProducerURL, logger)
 
 	mux := http.NewServeMux()
 
@@ -63,14 +62,14 @@ func NewServer(cfg config.Config, rdb *redis.Client, dynamoClient *dynamodb.Clie
 	mux.HandleFunc("POST /api/publish", handlers.HandlePublish)
 	mux.HandleFunc("POST /api/publish/bulk", handlers.HandlePublishBulk)
 
-	// Producer page
+	// Página do produtor
 	mux.HandleFunc("GET /producer", serveProducerPage)
 
-	// Dashboard gráfica
+	// Dashboard gráfico de métricas
 	mux.HandleFunc("GET /dashboard", serveDashboardPage)
 
 	s := &Server{
-		httpServer: nil, // assigned below
+		httpServer: nil, // atribuído abaixo
 		eventBus:   eventBus,
 		handlers:   handlers,
 		logger:     logger,
@@ -80,9 +79,9 @@ func NewServer(cfg config.Config, rdb *redis.Client, dynamoClient *dynamodb.Clie
 	s.initMetrics()
 
 	httpServer := &http.Server{
-		Addr:         ":" + cfg.UIPort,
+		Addr:         ":" + cfg.UI.Port,
 		Handler:      s.applyMiddleware(mux),
-		ReadTimeout:  cfg.UIReadTimeout,
+		ReadTimeout:  cfg.UI.ReadTimeout,
 		WriteTimeout: 0, // SSE connections are long-lived; write timeout would close them prematurely
 	}
 	s.httpServer = httpServer
@@ -90,7 +89,7 @@ func NewServer(cfg config.Config, rdb *redis.Client, dynamoClient *dynamodb.Clie
 	return s
 }
 
-// initMetrics initializes OTel metrics for the UI server.
+// initMetrics inicializa as métricas OTel para o servidor UI.
 func (s *Server) initMetrics() {
 	var err error
 
@@ -110,36 +109,36 @@ func (s *Server) initMetrics() {
 	}
 }
 
-// Start starts the HTTP server.
+// Start inicia o servidor HTTP.
 func (s *Server) Start() error {
 	s.logger.Info("starting UI server", "port", s.httpServer.Addr)
 	return s.httpServer.ListenAndServe()
 }
 
-// Shutdown gracefully shuts down the server.
+// Shutdown desliga o servidor de forma graciosa.
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.logger.Info("shutting down UI server")
 	s.eventBus.Close()
 	return s.httpServer.Shutdown(ctx)
 }
 
-// Handler returns the HTTP handler for testing purposes.
+// Handler retorna o handler HTTP para fins de teste.
 func (s *Server) Handler() http.Handler {
 	return s.httpServer.Handler
 }
 
-// ServeHTTP allows testing the server via httptest.
+// ServeHTTP permite testar o servidor via httptest.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.httpServer.Handler.ServeHTTP(w, r)
 }
 
-// Stop performs a forceful shutdown (for tests).
+// Stop realiza um desligamento forçado (para testes).
 func (s *Server) Stop() {
 	s.eventBus.Close()
 	s.httpServer.Close()
 }
 
-// serveProducerPage serves the producer HTML page from embedded files.
+// serveProducerPage serve a página HTML do produtor a partir dos arquivos embutidos.
 func serveProducerPage(w http.ResponseWriter, r *http.Request) {
 	data, err := staticFiles.ReadFile("static/producer.html")
 	if err != nil {
@@ -150,7 +149,7 @@ func serveProducerPage(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(data)
 }
 
-// serveDashboardPage serves the dashboard graphics HTML page.
+// serveDashboardPage serve a página HTML do dashboard gráfico.
 func serveDashboardPage(w http.ResponseWriter, r *http.Request) {
 	data, err := staticFiles.ReadFile("static/dashboard.html")
 	if err != nil {
@@ -161,7 +160,7 @@ func serveDashboardPage(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(data)
 }
 
-// applyMiddleware chains logging, security headers, OTel instrumentation, and recovery middleware.
+// applyMiddleware encadeia logging, headers de segurança, instrumentação OTel e recovery.
 func (s *Server) applyMiddleware(next http.Handler) http.Handler {
 	return recoveryMiddleware(
 		securityHeadersMiddleware(
@@ -172,7 +171,7 @@ func (s *Server) applyMiddleware(next http.Handler) http.Handler {
 	)
 }
 
-// loggingMiddleware logs each HTTP request.
+// loggingMiddleware registra cada requisição HTTP no log.
 func loggingMiddleware(next http.Handler, logger *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -187,7 +186,7 @@ func loggingMiddleware(next http.Handler, logger *slog.Logger) http.Handler {
 	})
 }
 
-// otelMiddleware instruments each HTTP request with OTel metrics and tracing.
+// otelMiddleware instrumenta cada requisição HTTP com métricas e tracing OTel.
 func (s *Server) otelMiddleware(next http.Handler) http.Handler {
 	if s.meter == nil {
 		return next
@@ -232,7 +231,7 @@ func (s *Server) otelMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// securityHeadersMiddleware adds security-related HTTP headers.
+// securityHeadersMiddleware adiciona headers HTTP relacionados à segurança.
 func securityHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -250,7 +249,7 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// recoveryMiddleware catches panics and returns 500.
+// recoveryMiddleware captura pânicos e retorna 500.
 func recoveryMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {

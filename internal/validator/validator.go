@@ -13,7 +13,7 @@ import (
 
 const maxPayloadSize = 10 * 1024 // 10 KB
 
-// Validator defines the interface for payload validation.
+// Validator define a interface para validação de payload.
 type Validator interface {
 	Validate(ctx context.Context, data []byte) (*models.PaymentEvent, error)
 }
@@ -22,7 +22,7 @@ type paymentValidator struct {
 	validate *goValidator.Validate
 }
 
-// New creates a new Validator with custom validation rules.
+// New cria um novo Validator com regras de validação personalizadas.
 func New() Validator {
 	v := goValidator.New()
 	if err := v.RegisterValidation("rfc3339", validateRFC3339); err != nil {
@@ -55,10 +55,10 @@ func (pv *paymentValidator) Validate(ctx context.Context, data []byte) (*models.
 	return &event, nil
 }
 
-// validateRFC3339 checks if the string is a valid RFC3339 timestamp,
-// is not in the future (max 5 min skew allowed).
-// validatePrintASCII checks that the string contains only printable ASCII characters
-// (0x20-0x7E), rejecting control characters.
+// validatePrintASCII verifica se a string contém apenas caracteres ASCII imprimíveis
+// (0x20-0x7E), rejeitando caracteres de controle.
+// validateRFC3339 verifica se a string é um timestamp RFC3339 válido
+// e não está no futuro (tolerância máxima de 5 min).
 func validatePrintASCII(fl goValidator.FieldLevel) bool {
 	s := fl.Field().String()
 	for _, r := range s {

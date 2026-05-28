@@ -6,7 +6,7 @@ import (
 	"github.com/Daniel-Dos/gopayground/internal/models"
 )
 
-// Publisher publishes payment events to be consumed by the UI (SSE).
+// Publisher publica eventos de pagamento para serem consumidos pela UI (SSE).
 type Publisher interface {
 	Publish(ctx context.Context, event *models.PaymentEvent) error
 }

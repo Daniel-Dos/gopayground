@@ -2,27 +2,25 @@
 
 ## Riscos
 
-### R01 — Kafka Broker Indisponível
+### R01 — Producer Service Indisponível
 
-**Probabilidade**: Média (em desenvolvimento, Kafka pode não estar rodando)
+**Probabilidade**: Média (serviço standalone pode não estar rodando)
 **Impacto**: Alto (impossibilidade de publicar)
 
 **Mitigação**:
-- Handler verifica se `kafkaProducer` é `nil` antes de publicar
-- Retorna 502 com mensagem clara "Kafka não disponível"
-- Servidor não falha na inicialização se Kafka estiver offline
-- Log estruturado de warning na inicialização
+- Handler faz HTTP POST com timeout de 10s
+- Se conexão falhar, retorna 502 com mensagem "Producer Service indisponível"
+- A UI e a dashboard continuam funcionando normalmente (apenas publish afetado)
+- Log estruturado de erro com detalhes da falha
 
 ### R02 — EventBus (Redis) Indisponível
 
 **Probabilidade**: Baixa (Redis é serviço essencial, já usado pela dashboard)
-**Impacto**: Médio (evento é publicado no Kafka mas não aparece no SSE feed)
+**Impacto**: Baixo (não afeta o publish — a UI não publica mais no EventBus)
 
-**Mitigação**:
-- Publicação no EventBus é feita **após** sucesso no Kafka
-- Se EventBus falhar, loga warning mas não falha a request
-- Evento será processado pelo consumer e aparecerá na dashboard via polling
-- O EventBus já trata subscriber lento com dropping (spec existente)
+**Nota**: O EventBus (Redis Pub/Sub) agora é responsabilidade exclusiva do
+Consumer (spec `0001-kafka-payment-consumer`), que publica eventos após
+processá-los. A UI apenas consome o EventBus para o SSE feed da dashboard.
 
 ### R03 — Rate Limiting / Abuso
 
@@ -46,13 +44,14 @@
 
 ### R05 — Concorrência / Race Condition
 
-**Probabilidade**: Baixa (SyncProducer do Sarama é thread-safe)
+**Probabilidade**: Baixa (stdlib `net/http` é thread-safe)
 **Impacto**: Médio
 
 **Mitigação**:
-- `sarama.SyncProducer.SendMessage` é thread-safe
-- Múltiplas goroutines (várias requests simultâneas) podem publicar sem race
-- EventBus.Publish usa Redis Pub/Sub que é thread-safe
+- `http.Client` do stdlib é thread-safe e pode ser reusado por múltiplas goroutines
+- Cada request HTTP cria seu próprio contexto com timeout (`context.WithTimeout`)
+- Rate limit usa `sync.Map` (thread-safe)
+- Múltiplas requests simultâneas são serializadas pelo `http.Transport` interno
 
 ### R06 — Duplicidade de Eventos
 
@@ -65,37 +64,49 @@
 
 ## Trade-offs
 
-### T01 — Injetar SyncProducer no Server (vs. serviço separado)
+### T01 — Chamar Producer via HTTP (vs. Kafka embutido na UI)
 
-**Decisão**: Injetar diretamente no Server/Handlers da UI
+**Decisão**: UI removeu o produtor Kafka embutido e passou a chamar o
+Producer Service via HTTP.
 
 **Prós**:
-- Simplicidade: sem novo microsserviço, sem nova porta, sem nova goroutine
-- Código reusa tipos e interfaces existentes (`models.PaymentEvent`, `validator`)
-- Latência mínima (publicação direta no Kafka)
+- **Separação de responsabilidades**: UI não precisa saber de Kafka, brokers,
+  tópicos, ou configurar Sarama
+- **Menos dependências**: UI não depende mais de `sarama` (Kafka client)
+- **Menos pontos de falha**: UI não precisa de conectividade de rede com Kafka
+- **Escalabilidade**: Producer Service pode ser escalado independentemente
+- **Reuso**: O mesmo Producer Service atende CLI e UI (endpoints HTTP unificados)
+- **Deploy independente**: UI pode ser atualizada sem afetar a lógica de publicação
 
 **Contras**:
-- Acopla UI ao Kafka (se Kafka não estiver disponível, UI ainda funciona mas sem publish)
-- Adiciona dependência de infraestrutura ao serviço web (precisa de Kafka brokers configurados)
-- Aumenta complexidade do `cmd/ui/main.go` (precisa conectar Kafka)
+- **Latência adicional**: ~1-2ms extra por chamada HTTP (vs. publicação direta)
+- **Nova dependência de rede**: UI precisa alcançar o Producer Service via HTTP
+- **Nova falha potencial**: Producer Service pode estar offline
+- **Manutenção de mais um serviço**: Producer Service precisa ser deployado e
+  monitorado separadamente
 
 **Justificativa**: Aceito porque:
-- A UI já depende de Redis e DynamoDB (Kafka é mais uma dependência de infra)
-- O consumer já faz o contrário (conecta Kafka + Redis + DynamoDB)
-- A equipe já conhece Sarama e o padrão de injeção
+- A UI já depende de Redis e DynamoDB (Producer Service é mais claro que
+  adicionar Kafka como dependência direta)
+- O Producer Service já existe (spec `0003-cli-producer`) — é o mesmo código
+  com um wrapper HTTP
+- A latência adicional é negligenciável para casos de uso manuais (desenvolvedor/QA)
+- A separação permite que o Producer Service seja usado por CLI, UI e futuros
+  clientes (integrações, scripts)
 
-### T02 — Publicar no EventBus (Redis Pub/Sub) vs. Esperar Consumer
+### T02 — Delegar Publicação ao Producer (vs. Publicar Direto na UI)
 
-**Decisão**: Publicar no EventBus imediatamente após Kafka
+**Decisão**: A UI não publica mais diretamente no Kafka nem no EventBus.
+Toda publicação é delegada ao Producer Service via HTTP.
 
-**Alternativa considerada**: Publicar apenas no Kafka e esperar o consumer
-processar e publicar no EventBus.
+**Alternativa considerada**: Manter SyncProducer embutido na UI (arquitetura anterior).
 
 **Motivo da rejeição**:
-- Latência maior (evento publicado na UI só apareceria após consumer processar)
-- Mais complexidade de depuração
-- Se o consumer estiver offline, evento nunca aparece na dashboard
-- O custo de publicar no Redis Pub/Sub é baixíssimo (~1ms)
+- Acoplamento desnecessário: UI não precisa conhecer detalhes de infraestrutura Kafka
+- Duplicação de lógica: CLI e UI teriam código de publicação duplicado
+- Dificuldade de manutenção: mudanças na lógica de publicação exigiriam alterar
+  dois lugares (CLI + UI)
+- O Producer Service já existe e faz tudo que a UI precisa
 
 ### T03 — Frontend Vanilla vs. Framework
 
@@ -129,5 +140,9 @@ e reuso de `producer.GenerateBulkEvents()`.
 |-------------------------|------------------------------------------------|
 | 0001 (consumer)         | Nenhum (consumer continua idêntico)            |
 | 0002 (dashboard)        | Baixo (adição de link de navegação no header + docs) |
-| 0003 (CLI producer)     | Nenhum (CLI continua funcionando)              |
+| 0003 (CLI producer)     | **Médio**: O `producer.Service` (spec `0003`) agora também atende via HTTP.
+                           A interface `Service.Publish()` ganhou um wrapper HTTP
+                           para receber requisições da UI. O header `source`
+                           permanece `"cli-producer"` independente da origem.
+                           O CLI continua funcionando exatamente como antes.      |
 | Documentação            | Novo: documentação é copiada para `static/docs/` no build e servida em `/docs/` |

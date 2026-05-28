@@ -2,53 +2,66 @@
 
 ## Etapas
 
-### Etapa 1 — Injetar SyncProducer no Server e Handlers
+### Etapa 1 — Adicionar ProducerURL na Config
 
-**Arquivos**: `cmd/ui/main.go`, `internal/ui/server.go`, `internal/ui/handlers.go`
+**Arquivo**: `internal/config/config.go`
 
-1. Em `cmd/ui/main.go`:
-   - Criar `sarama.NewConfig()` com `Producer.Return.Successes = true`
-   - Conectar `sarama.NewSyncProducer(brokers, config)`
-   - Tratar erro graceful: log.Warn + `kafkaProducer = nil`
-   - Passar `kafkaProducer` como parâmetro para `ui.NewServer()`
-   - Garantir `defer kafkaProducer.Close()`
-
-2. Em `internal/ui/server.go`:
-   - Adicionar parâmetro `kafkaProducer sarama.SyncProducer` ao `NewServer()`
-   - Passar para `NewHandlers()`
-
-3. Em `internal/ui/handlers.go`:
-   - Adicionar campos `kafkaProducer sarama.SyncProducer` e `kafkaTopic string`
-   - Atualizar `NewHandlers()` para aceitar e armazenar os novos parâmetros
+1. Adicionar campo `ProducerURL string` na struct `UIConfig`:
+   ```go
+   ProducerURL string `env:"UI_PRODUCER_URL" default:"http://localhost:8082"`
+   ```
 
 **Critério de aceite**: `go build ./cmd/ui/` compila sem erros
 
-### Etapa 2 — Implementar Handler HandlePublish
+### Etapa 2 — Remover SyncProducer do Server e Injetar ProducerURL
+
+**Arquivos**: `internal/ui/server.go`, `cmd/ui/main.go`
+
+1. Em `internal/ui/server.go`:
+   - Remover parâmetro `kafkaProducer sarama.SyncProducer` do `NewServer()`
+   - Remover import de `sarama`
+   - Passar `cfg.UI.ProducerURL` para `NewHandlers()`
+   - O Server cria um `http.Client` interno com timeout
+
+2. Em `cmd/ui/main.go`:
+   - **Remover** todo o bloco de conexão Kafka SyncProducer
+   - **Remover** `createKafkaProducer()`, `sarama.SyncProducer`, `producer.Service`
+   - **Remover** `defer kafkaProducer.Close()`
+   - Chamar `ui.NewServer(cfg, rdb, dynamoClient, logger)` sem produtor
+
+**Critério de aceite**: `go build ./cmd/ui/` compila sem dependência de `sarama`
+
+### Etapa 3 — Implementar Handler HandlePublish (HTTP Client)
 
 **Arquivo**: `internal/ui/handlers.go`
 
-1. Adicionar método `HandlePublish(w http.ResponseWriter, r *http.Request)`
-2. Fluxo:
+1. Adicionar campos ao `Handlers`:
+   ```go
+   producerURL  string
+   httpClient   *http.Client
+   ```
+
+2. Adicionar método `HandlePublish(w http.ResponseWriter, r *http.Request)`
+3. Fluxo:
    - `r.Body = http.MaxBytesReader(w, r.Body, 100*1024)`
    - `json.NewDecoder(r.Body).Decode(&event)`
    - Se `event.PaymentID` vazio, gerar com `uuid.New().String()`
    - Se `event.Timestamp` vazio, preencher com `time.Now().UTC().Format(time.RFC3339)`
-   - Validar com `h.validator.Validate(ctx, data)`
-   - Publicar no Kafka com `h.kafkaProducer.SendMessage(msg)`
-   - Publicar no EventBus com `h.eventBus.Publish(ctx, event)` (não-bloqueante)
-   - Retornar JSON com status, partition, offset
-3. Se `kafkaProducer` for `nil`, retornar 502 com mensagem "Kafka não disponível"
+   - Fazer HTTP POST para `h.producerURL + "/publish"` com o JSON do evento
+   - Timeout de 10s via `context.WithTimeout`
+   - Encaminhar resposta do Producer para o cliente
+4. Se Producer Service retornar erro ou estiver indisponível, retornar 502
 
-### Etapa 3 — Implementar Handler HandlePublishBulk
+### Etapa 4 — Implementar Handler HandlePublishBulk
 
 **Arquivo**: `internal/ui/handlers.go`
 
 1. Adicionar método `HandlePublishBulk(w http.ResponseWriter, r *http.Request)`
 2. Ler `count` do body JSON (default 10, max 50)
-3. Chamar `producer.GenerateBulkEvents(count)` e iterar publicando cada um
-4. Coletar resultados e retornar array no response
+3. Encaminhar requisição para `h.producerURL + "/publish/bulk"`
+4. Devolver resposta do Producer diretamente ao cliente
 
-### Etapa 4 — Registrar Rotas no Server
+### Etapa 5 — Registrar Rotas no Server
 
 **Arquivo**: `internal/ui/server.go`
 
@@ -62,7 +75,7 @@ mux.HandleFunc("POST /api/publish/bulk", handlers.HandlePublishBulk)
 A rota `GET /producer` será servida automaticamente pelo `http.FileServer`
 já que `producer.html` estará dentro da pasta `static/`.
 
-### Etapa 5 — Criar producer.html
+### Etapa 6 — Criar producer.html
 
 **Arquivo**: `internal/ui/static/producer.html`
 
@@ -73,7 +86,7 @@ já que `producer.html` estará dentro da pasta `static/`.
 5. Tabela de histórico
 6. Container de toast
 
-### Etapa 6 — Criar producer.js
+### Etapa 7 — Criar producer.js
 
 **Arquivo**: `internal/ui/static/producer.js`
 
@@ -86,7 +99,7 @@ já que `producer.html` estará dentro da pasta `static/`.
 7. Toasts de feedback visual
 8. Atualizar `index.html` para incluir link para `/producer`
 
-### Etapa 6.5 — Atualizar Makefile e Dockerfile para copy-docs
+### Etapa 7.5 — Atualizar Makefile e Dockerfile para copy-docs
 
 **Arquivos**: `Makefile`, `Dockerfile.ui`
 
@@ -114,7 +127,7 @@ RUN go build -o /app/ui ./cmd/ui
 Isso garante que a documentação seja embutida no binário via
 `//go:embed static/*` e servida em `/docs/`.
 
-### Etapa 7 — Adicionar Estilos
+### Etapa 8 — Adicionar Estilos
 
 **Arquivo**: `internal/ui/static/style.css`
 
@@ -126,7 +139,7 @@ Adicionar classes CSS para:
 - `.toast`, `.toast.success`, `.toast.error`
 - `.header-nav`
 
-### Etapa 8 — Atualizar index.html
+### Etapa 9 — Atualizar index.html
 
 **Arquivo**: `internal/ui/static/index.html`
 
@@ -140,7 +153,7 @@ Adicionar link de navegação no header:
 </nav>
 ```
 
-### Etapa 9 — Atualizar docker-compose.yml
+### Etapa 10 — Atualizar docker-compose.yml
 
 **Arquivo**: `docker-compose.yml`
 
@@ -148,46 +161,50 @@ Adicionar ao serviço `payment-ui`:
 
 ```yaml
 environment:
-  - KAFKA_BROKERS=kafka:9092
-  - KAFKA_TOPIC=payment.events
+  - UI_PRODUCER_URL=http://producer:8082
 ```
 
-### Etapa 10 — Testes
+> Nota: Remover `KAFKA_BROKERS` e `KAFKA_TOPIC` do serviço `payment-ui`
+> (essas variáveis agora são configuradas no serviço `producer`).
+
+### Etapa 11 — Testes
 
 **Arquivo**: `internal/ui/handlers_test.go`
 
 Adicionar testes:
 
-1. `TestHandlePublish_Valid` — submeter evento válido, verificar 200
+1. `TestHandlePublish_Valid` — submeter evento válido, mock HTTP server do Producer retorna 200, verificar 200
 2. `TestHandlePublish_InvalidPayload` — JSON mal formado, verificar 400
-3. `TestHandlePublish_ValidationError` — amount negativo, verificar 400
-4. `TestHandlePublish_KafkaDown` — mock producer retorna erro, verificar 502
-5. `TestHandlePublishBulk` — submeter count=3, verificar 200 com 3 resultados
+3. `TestHandlePublish_ProducerDown` — Producer Service offline, verificar 502
+4. `TestHandlePublish_ProducerError` — Producer retorna 400/422, verificar eco do erro
+5. `TestHandlePublishBulk` — submeter count=3, mock Producer retorna 200 com 3 resultados
 
 ## Dependências
 
-- Nenhuma nova dependência Go (reusa sarama, validator, models)
+- Nenhuma nova dependência Go (usa apenas stdlib `net/http` para HTTP client, reusa `models`, `validator`)
+- Nenhuma dependência de `sarama` na UI (removeu completamente)
 - Nenhuma nova dependência frontend (HTML+CSS+JS vanilla)
 
 ## Ordem de Implementação Sugerida
 
 ```
-1. handlers.go  →  Adicionar campos kafkaProducer/kafkaTopic
-2. server.go    →  Injetar kafkaProducer, registrar rotas
-3. main.go      →  Conectar Kafka, passar para NewServer
-4. handler.go   →  Implementar HandlePublish + HandlePublishBulk
-5. style.css    →  Adicionar estilos do formulário
-6. producer.js  →  Lógica frontend
-7. producer.html → Página HTML
-8. index.html   →  Adicionar navegação
-9. docker-compose.yml → Env vars Kafka
-10. handlers_test.go → Testes
+1. config.go     →  Adicionar ProducerURL
+2. handlers.go   →  Adicionar campos producerURL/httpClient
+3. server.go     →  NewServer sem SyncProducer, registrar rotas
+4. main.go       →  Remover conexão Kafka, chamar NewServer simplificado
+5. handlers.go   →  Implementar HandlePublish + HandlePublishBulk (HTTP)
+6. style.css     →  Adicionar estilos do formulário
+7. producer.js   →  Lógica frontend
+8. producer.html →  Página HTML
+9. index.html    →  Adicionar navegação
+10. docker-compose.yml → Env var UI_PRODUCER_URL
+11. handlers_test.go → Testes com mock HTTP server
 ```
 
 ## Checklist de Build
 
 ```bash
-go build ./cmd/ui/          # deve compilar
+go build ./cmd/ui/          # deve compilar (sem sarama)
 go vet ./internal/ui/       # sem warnings
 go test ./internal/ui/      # todos os testes passam
 ```

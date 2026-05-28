@@ -14,17 +14,17 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Daniel-Dos/gopayground/internal/kafka"
 	"github.com/Daniel-Dos/gopayground/internal/models"
 	"github.com/Daniel-Dos/gopayground/internal/producer"
 	"github.com/Daniel-Dos/gopayground/internal/validator"
 
-	"github.com/IBM/sarama"
 	"github.com/google/uuid"
 )
 
 const maxFileSize = 10 * 1024 * 1024
 
-// flags holds the CLI flags for the "publish" subcommand.
+// flags contém as flags de linha de comando para o subcomando "publish".
 type flags struct {
 	paymentID   string
 	status      string
@@ -41,8 +41,8 @@ type flags struct {
 	jsonOutput  bool
 }
 
-// newPublishFlagSet creates a FlagSet for the "publish" subcommand and
-// binds all publish-specific flags to the given flags struct.
+// newPublishFlagSet cria um FlagSet para o subcomando "publish" e
+// vincula todas as flags específicas ao struct flags fornecido.
 func newPublishFlagSet(f *flags) *flag.FlagSet {
 	fs := flag.NewFlagSet("publish", flag.ContinueOnError)
 
@@ -73,7 +73,7 @@ func newPublishFlagSet(f *flags) *flag.FlagSet {
 	return fs
 }
 
-// parsePublishFlags parses args (without subcommand) into a flags struct.
+// parsePublishFlags converte os args (sem subcomando) em um struct flags.
 func parsePublishFlags(args []string) (flags, error) {
 	var f flags
 	fs := newPublishFlagSet(&f)
@@ -254,15 +254,15 @@ func main() {
 	os.Exit(run())
 }
 
-// serveFlags holds the CLI flags for the "serve" subcommand.
+// serveFlags contém as flags de linha de comando para o subcomando "serve".
 type serveFlags struct {
 	port    string
 	brokers string
 	topic   string
 }
 
-// newServeFlagSet creates a FlagSet for the "serve" subcommand and
-// binds all serve-specific flags to the given serveFlags struct.
+// newServeFlagSet cria um FlagSet para o subcomando "serve" e
+// vincula todas as flags específicas ao struct serveFlags fornecido.
 func newServeFlagSet(f *serveFlags) *flag.FlagSet {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 
@@ -278,7 +278,7 @@ func newServeFlagSet(f *serveFlags) *flag.FlagSet {
 	return fs
 }
 
-// parseServeFlagsArgs parses args (without subcommand) into a serveFlags struct.
+// parseServeFlagsArgs converte os args (sem subcomando) em um struct serveFlags.
 func parseServeFlagsArgs(args []string) (serveFlags, error) {
 	var f serveFlags
 	fs := newServeFlagSet(&f)
@@ -288,52 +288,12 @@ func parseServeFlagsArgs(args []string) (serveFlags, error) {
 	return f, nil
 }
 
-// connectProducerWithRetry tries to create a Sarama SyncProducer with
-// exponential backoff, respecting context cancellation.
-// Sequence: 500ms, 1s, 2s, 4s, 8s, 8s, ... (capped at 8s)
-// Total wall-clock timeout: ~30 seconds.
-func connectProducerWithRetry(ctx context.Context, brokers []string, config *sarama.Config) (sarama.SyncProducer, error) {
-	backoff := 500 * time.Millisecond
-	const maxBackoff = 8 * time.Second
-	const maxElapsed = 30 * time.Second
-	deadline := time.Now().Add(maxElapsed)
-
-	for {
-		producer, err := sarama.NewSyncProducer(brokers, config)
-		if err == nil {
-			return producer, nil
-		}
-
-		// Prefer context cancellation over deadline checks.
-		if ctx.Err() != nil {
-			return nil, fmt.Errorf("canceled while waiting for Kafka: %w", ctx.Err())
-		}
-
-		if time.Now().After(deadline) {
-			return nil, fmt.Errorf("timed out after %v connecting to Kafka: %w", maxElapsed, err)
-		}
-
-		fmt.Fprintf(os.Stderr, "warning: Kafka not ready, retrying in %v... (%v)\n", backoff, err)
-
-		select {
-		case <-ctx.Done():
-			return nil, fmt.Errorf("canceled while waiting for Kafka: %w", ctx.Err())
-		case <-time.After(backoff):
-		}
-
-		backoff *= 2
-		if backoff > maxBackoff {
-			backoff = maxBackoff
-		}
-	}
-}
-
 func run() int {
 	args := os.Args[1:]
 
-	// Extract subcommand if present. A valid subcommand is the first argument
-	// that does not start with '-'. This ensures "producer publish --count 10",
-	// "producer serve --port 8082", and "producer --flag value" all work.
+	// Extrai subcomando se presente. Um subcomando válido é o primeiro argumento
+	// que não começa com '-'. Isso garante que "producer publish --count 10",
+	// "producer serve --port 8082" e "producer --flag value" funcionem.
 	sub, rest := parseSubcommand(args)
 
 	switch sub {
@@ -351,8 +311,8 @@ func run() int {
 	}
 }
 
-// parseSubcommand separates the subcommand (first non-flag argument) from the rest.
-// Returns the subcommand and the remaining arguments (without the subcommand).
+// parseSubcommand separa o subcomando (primeiro argumento não-flag) do resto.
+// Retorna o subcomando e os argumentos restantes (sem o subcomando).
 func parseSubcommand(args []string) (subcommand string, rest []string) {
 	if len(args) == 0 {
 		return "", nil
@@ -394,13 +354,8 @@ func runPublish(args []string) int {
 		return 0
 	}
 
-	config := sarama.NewConfig()
-	config.Producer.Return.Successes = true
-	config.Producer.Timeout = 10 * time.Second
-	config.Net.DialTimeout = 5 * time.Second
-	config.Producer.MaxMessageBytes = 100 * 1024
-
-	syncProducer, err := connectProducerWithRetry(ctx, strings.Split(f.brokers, ","), config)
+	saramaCfg := kafka.NewProducerSaramaConfig(kafka.DefaultProducerConfig())
+	syncProducer, err := kafka.NewSyncProducerWithRetry(ctx, strings.Split(f.brokers, ","), saramaCfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: cannot connect to Kafka: %v\n", err)
 		return 1
@@ -417,8 +372,8 @@ func runPublish(args []string) int {
 	return 0
 }
 
-// runServe starts a long-lived HTTP server that exposes Kafka publishing endpoints.
-// This is the mode used in docker-compose for the "producer" service.
+// runServe inicia um servidor HTTP de longa duração que expõe endpoints de publicação Kafka.
+// Este é o modo usado no docker-compose para o serviço "producer".
 func runServe(args []string) int {
 	f, err := parseServeFlagsArgs(args)
 	if err != nil {
@@ -426,11 +381,11 @@ func runServe(args []string) int {
 		return 1
 	}
 
-	// Structured logger (same pattern as consumer and UI)
+	// Logger estruturado (mesmo padrão do consumidor e UI)
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
 
-	logger.Info("starting producer HTTP server",
+	logger.Info("iniciando servidor HTTP do produtor",
 		"port", f.port,
 		"brokers", f.brokers,
 		"topic", f.topic,
@@ -439,23 +394,18 @@ func runServe(args []string) int {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Trap SIGINT/SIGTERM for graceful shutdown
+	// Captura SIGINT/SIGTERM para desligamento gracioso
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		sig := <-sigCh
-		logger.Info("shutdown signal received", "signal", sig.String())
+		logger.Info("sinal de desligamento recebido", "signal", sig.String())
 		cancel()
 	}()
 
-	// Connect to Kafka with retry
-	saramaCfg := sarama.NewConfig()
-	saramaCfg.Producer.Return.Successes = true
-	saramaCfg.Producer.Timeout = 10 * time.Second
-	saramaCfg.Net.DialTimeout = 5 * time.Second
-	saramaCfg.Producer.MaxMessageBytes = 100 * 1024
-
-	syncProducer, err := connectProducerWithRetry(ctx, strings.Split(f.brokers, ","), saramaCfg)
+	// Conectar ao Kafka com retry
+	saramaCfg := kafka.NewProducerSaramaConfig(kafka.DefaultProducerConfig())
+	syncProducer, err := kafka.NewSyncProducerWithRetry(ctx, strings.Split(f.brokers, ","), saramaCfg)
 	if err != nil {
 		logger.Error("cannot connect to Kafka", "error", err)
 		return 1
@@ -469,7 +419,7 @@ func runServe(args []string) int {
 	v := validator.New()
 	svc := producer.New(syncProducer, f.topic, v)
 
-	// Publish 10 random events at startup (best-effort)
+	// Publica 10 eventos aleatórios na inicialização (melhor esforço)
 	go func() {
 		startupCtx, startupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer startupCancel()
@@ -482,10 +432,10 @@ func runServe(args []string) int {
 				published++
 			}
 		}
-		logger.Info("startup publish completed", "total", len(events), "published", published)
+		logger.Info("publicação inicial concluída", "total", len(events), "published", published)
 	}()
 
-	// HTTP server setup
+	// Configuração do servidor HTTP
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /publish", handlePublish(svc, logger))
 	mux.HandleFunc("POST /publish/bulk", handlePublishBulk(svc, logger))
@@ -499,7 +449,7 @@ func runServe(args []string) int {
 		WriteTimeout: 10 * time.Second,
 	}
 
-	// Graceful shutdown goroutine
+	// Goroutine de desligamento gracioso
 	go func() {
 		<-ctx.Done()
 		logger.Info("shutting down HTTP server")
@@ -520,7 +470,7 @@ func runServe(args []string) int {
 	return 0
 }
 
-// --- HTTP handler types ---
+// Tipos para os handlers HTTP do produtor
 
 type publishRequest struct {
 	PaymentID   string  `json:"payment_id"`
@@ -549,7 +499,7 @@ type bulkPublishItem struct {
 	Error     string `json:"error,omitempty"`
 }
 
-// validStatuses contains the allowed payment status values.
+// validStatuses contém os valores de status de pagamento permitidos.
 var validStatuses = map[string]bool{
 	"pending":   true,
 	"confirmed": true,
@@ -557,7 +507,7 @@ var validStatuses = map[string]bool{
 	"refunded":  true,
 }
 
-// handlePublish returns an HTTP handler that publishes a single payment event to Kafka.
+// handlePublish retorna um handler HTTP que publica um único evento de pagamento no Kafka.
 func handlePublish(svc producer.Service, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Validate Content-Type
@@ -596,7 +546,7 @@ func handlePublish(svc producer.Service, logger *slog.Logger) http.HandlerFunc {
 			return
 		}
 
-		// Build the payment event
+		// Montar o evento de pagamento
 		if req.PaymentID == "" {
 			req.PaymentID = uuid.New().String()
 		}
@@ -640,7 +590,7 @@ func handlePublish(svc producer.Service, logger *slog.Logger) http.HandlerFunc {
 	}
 }
 
-// handlePublishBulk returns an HTTP handler that generates and publishes N payment events.
+// handlePublishBulk retorna um handler HTTP que gera e publica N eventos de pagamento.
 func handlePublishBulk(svc producer.Service, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Validate Content-Type
@@ -692,14 +642,14 @@ func handlePublishBulk(svc producer.Service, logger *slog.Logger) http.HandlerFu
 	}
 }
 
-// handleHealthz returns a simple health check response.
+// handleHealthz retorna uma resposta simples de health check.
 func handleHealthz(logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	}
 }
 
-// writeJSON is a helper to write a JSON response with a status code.
+// writeJSON é um helper para escrever uma resposta JSON com código de status.
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

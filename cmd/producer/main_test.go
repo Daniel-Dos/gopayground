@@ -57,8 +57,7 @@ func TestParseFlags_Custom(t *testing.T) {
 }
 
 func TestParseFlags_WithPublishSubcommand(t *testing.T) {
-	// Simula exatamente como o docker-compose chama:
-	// command: ["publish", "--count", "10", "--rate", "2", "--brokers", "kafka:9092"]
+	// Simula exatamente como o docker-compose chama: command: ["publish", ...]
 	// parsePublishFlags recebe apenas os args após o subcomando
 	f, err := parsePublishFlags([]string{
 		"--count", "10",

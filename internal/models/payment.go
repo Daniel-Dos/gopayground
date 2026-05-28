@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-// PaymentEvent represents the event received from Kafka.
+// PaymentEvent representa o evento recebido do Kafka.
 type PaymentEvent struct {
 	PaymentID   string  `json:"payment_id"   validate:"required,uuid4"`
 	Status      string  `json:"status"       validate:"required,oneof=pending confirmed failed refunded"`
@@ -12,14 +12,14 @@ type PaymentEvent struct {
 	Timestamp   string  `json:"timestamp"    validate:"required,rfc3339"`
 }
 
-// PaymentStatus represents the current status in Redis.
+// PaymentStatus representa o status atual no Redis.
 type PaymentStatus struct {
 	PaymentID string `json:"payment_id"`
 	Status    string `json:"status"`
 	UpdatedAt string `json:"updated_at"`
 }
 
-// PaymentHistory represents the record in DynamoDB.
+// PaymentHistory representa o registro no DynamoDB.
 type PaymentHistory struct {
 	PaymentID   string    `dynamodbav:"payment_id"   json:"payment_id"`
 	Status      string    `dynamodbav:"status"       json:"status"`
@@ -31,7 +31,7 @@ type PaymentHistory struct {
 	TraceID     string    `dynamodbav:"trace_id"     json:"trace_id"`
 }
 
-// NewPaymentHistoryFromEvent creates a PaymentHistory from a PaymentEvent.
+// NewPaymentHistoryFromEvent cria um PaymentHistory a partir de um PaymentEvent.
 func NewPaymentHistoryFromEvent(event *PaymentEvent, traceID string) PaymentHistory {
 	return PaymentHistory{
 		PaymentID:   event.PaymentID,

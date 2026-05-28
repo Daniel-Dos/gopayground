@@ -8,7 +8,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// Checker defines the interface for idempotency checking.
+// Checker define a interface para verificação de idempotência.
 type Checker interface {
 	IsProcessed(ctx context.Context, paymentID string) (bool, error)
 	MarkProcessed(ctx context.Context, paymentID string) error
@@ -19,7 +19,7 @@ type redisChecker struct {
 	ttl    time.Duration
 }
 
-// NewChecker creates a new Redis-based idempotency checker.
+// NewChecker cria um novo verificador de idempotência baseado em Redis.
 func NewChecker(client *redis.Client, ttlHours int) Checker {
 	return &redisChecker{
 		client: client,

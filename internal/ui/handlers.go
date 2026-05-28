@@ -1,9 +1,11 @@
 package ui
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -12,9 +14,7 @@ import (
 	"time"
 
 	"github.com/Daniel-Dos/gopayground/internal/models"
-	"github.com/Daniel-Dos/gopayground/internal/producer"
 
-	"github.com/IBM/sarama"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -23,16 +23,16 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// SSE semaphore limits concurrent SSE connections.
+// Semáforo SSE limita conexões SSE concorrentes.
 var sseSemaphore = make(chan struct{}, 100)
 
-// SSE connection counters.
+// Contadores de conexão SSE.
 var (
 	sseConnections      int64
 	sseTotalConnections int64
 )
 
-// Metrics represents the aggregated metrics response.
+// Metrics representa a resposta agregada de métricas.
 type Metrics struct {
 	TotalProcessed int            `json:"total_processed"`
 	ByStatus       map[string]int `json:"by_status"`
@@ -40,36 +40,36 @@ type Metrics struct {
 	DLQCount       int            `json:"dlq_count"`
 }
 
-// DynamoDBQueryAPI defines the interface for DynamoDB Query operations.
+// DynamoDBQueryAPI define a interface para operações Query do DynamoDB.
 type DynamoDBQueryAPI interface {
 	Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
 }
 
-// Handlers holds the dependencies for HTTP handlers.
+// Handlers contém as dependências para os handlers HTTP.
 type Handlers struct {
-	redis         *redis.Client
-	dynamo        DynamoDBQueryAPI
-	dynamoTbl     string
-	eventBus      *EventBus
-	kafkaProducer sarama.SyncProducer
-	kafkaTopic    string
-	logger        *slog.Logger
+	redis       *redis.Client
+	dynamo      DynamoDBQueryAPI
+	dynamoTbl   string
+	eventBus    *EventBus
+	producerURL string
+	httpClient  *http.Client
+	logger      *slog.Logger
 }
 
-// NewHandlers creates a new Handlers instance.
-func NewHandlers(rdb *redis.Client, dynamoClient DynamoDBQueryAPI, dynamoTbl string, eventBus *EventBus, kafkaProducer sarama.SyncProducer, kafkaTopic string, logger *slog.Logger) *Handlers {
+// NewHandlers cria uma nova instância de Handlers.
+func NewHandlers(rdb *redis.Client, dynamoClient DynamoDBQueryAPI, dynamoTbl string, eventBus *EventBus, producerURL string, logger *slog.Logger) *Handlers {
 	return &Handlers{
-		redis:         rdb,
-		dynamo:        dynamoClient,
-		dynamoTbl:     dynamoTbl,
-		eventBus:      eventBus,
-		kafkaProducer: kafkaProducer,
-		kafkaTopic:    kafkaTopic,
-		logger:        logger,
+		redis:       rdb,
+		dynamo:      dynamoClient,
+		dynamoTbl:   dynamoTbl,
+		eventBus:    eventBus,
+		producerURL: producerURL,
+		httpClient:  &http.Client{Timeout: 10 * time.Second},
+		logger:      logger,
 	}
 }
 
-// HandleSSE streams events in real time via Server-Sent Events.
+// HandleSSE transmite eventos em tempo real via Server-Sent Events.
 func (h *Handlers) HandleSSE(w http.ResponseWriter, r *http.Request) {
 	if h.eventBus == nil {
 		http.Error(w, "event bus not available", http.StatusInternalServerError)
@@ -139,7 +139,7 @@ func (h *Handlers) HandleSSE(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HandleListPayments lists payments from Redis with optional filters.
+// HandleListPayments lista pagamentos do Redis com filtros opcionais.
 func (h *Handlers) HandleListPayments(w http.ResponseWriter, r *http.Request) {
 	filterID := strings.TrimSpace(r.URL.Query().Get("payment_id"))
 	filterStatus := strings.TrimSpace(r.URL.Query().Get("status"))
@@ -205,7 +205,7 @@ func (h *Handlers) HandleListPayments(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, payments)
 }
 
-// HandlePaymentHistory returns the full history of a payment from DynamoDB.
+// HandlePaymentHistory retorna o histórico completo de um pagamento do DynamoDB.
 func (h *Handlers) HandlePaymentHistory(w http.ResponseWriter, r *http.Request) {
 	paymentID := r.PathValue("id")
 	if paymentID == "" {
@@ -255,7 +255,7 @@ func (h *Handlers) HandlePaymentHistory(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, historyItems)
 }
 
-// HandleMetrics returns aggregate metrics from Redis.
+// HandleMetrics retorna métricas agregadas do Redis.
 func (h *Handlers) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -301,7 +301,7 @@ func (h *Handlers) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, metrics)
 }
 
-// HandleHealth performs a health check.
+// HandleHealth realiza uma verificação de saúde (health check).
 func (h *Handlers) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
@@ -350,7 +350,7 @@ type bulkPublishItem struct {
 	Error     string `json:"error,omitempty"`
 }
 
-// validStatuses contains the allowed payment statuses.
+// validStatuses contém os status de pagamento permitidos.
 var validStatuses = map[string]bool{
 	"pending":   true,
 	"confirmed": true,
@@ -358,14 +358,13 @@ var validStatuses = map[string]bool{
 	"refunded":  true,
 }
 
-// HandlePublish publishes a single payment event to Kafka and the EventBus.
+// HandlePublish publica um único evento de pagamento via Producer HTTP e no EventBus.
 func (h *Handlers) HandlePublish(w http.ResponseWriter, r *http.Request) {
-	if h.kafkaProducer == nil {
-		writeError(w, http.StatusBadGateway, "kafka not available")
+	if h.producerURL == "" {
+		writeError(w, http.StatusBadGateway, "producer not configured")
 		return
 	}
 
-	// Validate Content-Type
 	ct := r.Header.Get("Content-Type")
 	if ct != "" && ct != "application/json" && ct != "application/json; charset=utf-8" {
 		writeError(w, http.StatusUnsupportedMediaType, "Content-Type must be application/json")
@@ -376,32 +375,12 @@ func (h *Handlers) HandlePublish(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	var req publishRequest
-	r.Body = http.MaxBytesReader(w, r.Body, 65536) // 64KB limit
+	r.Body = http.MaxBytesReader(w, r.Body, 65536)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
 
-	// Validation
-	if req.Status != "" && !validStatuses[req.Status] {
-		writeError(w, http.StatusBadRequest, "invalid status: must be one of pending, confirmed, failed, refunded")
-		return
-	}
-	if req.Amount <= 0 {
-		writeError(w, http.StatusBadRequest, "amount must be greater than zero")
-		return
-	}
-	req.Currency = strings.ToUpper(strings.TrimSpace(req.Currency))
-	if len(req.Currency) != 3 {
-		writeError(w, http.StatusBadRequest, "currency must be a 3-letter code")
-		return
-	}
-	if len(req.Description) > 255 {
-		writeError(w, http.StatusBadRequest, "description too long (max 255 characters)")
-		return
-	}
-
-	// Build the payment event
 	if req.PaymentID == "" {
 		req.PaymentID = uuid.New().String()
 	}
@@ -409,69 +388,80 @@ func (h *Handlers) HandlePublish(w http.ResponseWriter, r *http.Request) {
 		req.Status = "pending"
 	}
 
-	event := &models.PaymentEvent{
-		PaymentID:   req.PaymentID,
-		Status:      req.Status,
-		Amount:      req.Amount,
-		Currency:    req.Currency,
-		Description: req.Description,
-		Timestamp:   time.Now().UTC().Format(time.RFC3339),
-	}
-
-	eventData, err := json.Marshal(event)
+	body, err := json.Marshal(req)
 	if err != nil {
-		h.logger.ErrorContext(ctx, "failed to marshal payment event", "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to marshal event")
+		writeError(w, http.StatusInternalServerError, "failed to encode request")
 		return
 	}
 
-	// Publish to Kafka
-	msg := &sarama.ProducerMessage{
-		Topic: h.kafkaTopic,
-		Key:   sarama.StringEncoder(event.PaymentID),
-		Value: sarama.ByteEncoder(eventData),
-		Headers: []sarama.RecordHeader{
-			{Key: []byte("source"), Value: []byte("ui-producer")},
-			{Key: []byte("timestamp"), Value: []byte(time.Now().UTC().Format(time.RFC3339))},
-		},
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", h.producerURL+"/publish", bytes.NewReader(body))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create request")
+		return
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := h.httpClient.Do(httpReq)
+	if err != nil {
+		h.logger.ErrorContext(ctx, "producer HTTP call failed", "error", err)
+		writeError(w, http.StatusBadGateway, "producer unavailable")
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "failed to read producer response")
+		return
 	}
 
-	partition, offset, err := h.kafkaProducer.SendMessage(msg)
-	if err != nil {
-		h.logger.ErrorContext(ctx, "kafka publish error", "payment_id", event.PaymentID, "error", err)
-		writeError(w, http.StatusBadGateway, "kafka publish failed")
+	if resp.StatusCode != http.StatusOK {
+		var errResp map[string]string
+		if json.Unmarshal(respBody, &errResp) == nil && errResp["error"] != "" {
+			writeError(w, resp.StatusCode, errResp["error"])
+		} else {
+			writeError(w, http.StatusBadGateway, "producer returned "+resp.Status)
+		}
+		return
+	}
+
+	var publishResp publishResponse
+	if err := json.Unmarshal(respBody, &publishResp); err != nil {
+		writeError(w, http.StatusBadGateway, "invalid producer response")
 		return
 	}
 
 	// Publish to EventBus so the SSE feed picks it up
 	if h.eventBus != nil {
+		event := &models.PaymentEvent{
+			PaymentID:   publishResp.PaymentID,
+			Status:      req.Status,
+			Amount:      req.Amount,
+			Currency:    req.Currency,
+			Description: req.Description,
+			Timestamp:   time.Now().UTC().Format(time.RFC3339),
+		}
 		if pubErr := h.eventBus.Publish(ctx, event); pubErr != nil {
 			h.logger.WarnContext(ctx, "eventbus publish error", "payment_id", event.PaymentID, "error", pubErr)
 		}
 	}
 
 	h.logger.InfoContext(ctx, "payment published",
-		"payment_id", event.PaymentID,
-		"partition", partition,
-		"offset", offset,
+		"payment_id", publishResp.PaymentID,
+		"partition", publishResp.Partition,
+		"offset", publishResp.Offset,
 	)
 
-	writeJSON(w, http.StatusOK, publishResponse{
-		Status:    "published",
-		PaymentID: event.PaymentID,
-		Partition: partition,
-		Offset:    offset,
-	})
+	writeJSON(w, http.StatusOK, publishResp)
 }
 
-// HandlePublishBulk publishes multiple generated payment events.
+// HandlePublishBulk publica múltiplos eventos de pagamento via Producer HTTP.
 func (h *Handlers) HandlePublishBulk(w http.ResponseWriter, r *http.Request) {
-	if h.kafkaProducer == nil {
-		writeError(w, http.StatusBadGateway, "kafka not available")
+	if h.producerURL == "" {
+		writeError(w, http.StatusBadGateway, "producer not configured")
 		return
 	}
 
-	// Validate Content-Type
 	ct := r.Header.Get("Content-Type")
 	if ct != "" && ct != "application/json" && ct != "application/json; charset=utf-8" {
 		writeError(w, http.StatusUnsupportedMediaType, "Content-Type must be application/json")
@@ -479,7 +469,7 @@ func (h *Handlers) HandlePublishBulk(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req bulkPublishRequest
-	r.Body = http.MaxBytesReader(w, r.Body, 4096) // 4KB limit (small payload)
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
@@ -490,70 +480,53 @@ func (h *Handlers) HandlePublishBulk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Use a derived context to bound the overall bulk operation
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 
-	events := producer.GenerateBulkEvents(req.Count)
-	results := make([]bulkPublishItem, 0, len(events))
-
-	for _, event := range events {
-		// Check for cancellation between iterations
-		select {
-		case <-ctx.Done():
-			results = append(results, bulkPublishItem{
-				PaymentID: event.PaymentID,
-				Status:    event.Status,
-				Error:     "request cancelled or timed out",
-			})
-			writeJSON(w, http.StatusOK, results)
-			return
-		default:
-		}
-		eventData, err := json.Marshal(event)
-		if err != nil {
-			results = append(results, bulkPublishItem{
-				PaymentID: event.PaymentID,
-				Status:    event.Status,
-				Error:     "marshal error",
-			})
-			continue
-		}
-
-		msg := &sarama.ProducerMessage{
-			Topic: h.kafkaTopic,
-			Key:   sarama.StringEncoder(event.PaymentID),
-			Value: sarama.ByteEncoder(eventData),
-			Headers: []sarama.RecordHeader{
-				{Key: []byte("source"), Value: []byte("ui-producer")},
-				{Key: []byte("timestamp"), Value: []byte(time.Now().UTC().Format(time.RFC3339))},
-			},
-		}
-
-		partition, offset, err := h.kafkaProducer.SendMessage(msg)
-		if err != nil {
-			h.logger.ErrorContext(ctx, "kafka publish error in bulk", "payment_id", event.PaymentID, "error", err)
-			results = append(results, bulkPublishItem{
-				PaymentID: event.PaymentID,
-				Status:    event.Status,
-				Error:     "kafka publish failed",
-			})
-			continue
-		}
-
-		// Note: EventBus publish is intentionally omitted here.
-		// The Kafka consumer will publish the processed event to the EventBus,
-		// avoiding duplicate delivery to SSE subscribers.
-
-		results = append(results, bulkPublishItem{
-			PaymentID: event.PaymentID,
-			Status:    event.Status,
-			Partition: partition,
-			Offset:    offset,
-		})
+	body, err := json.Marshal(req)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to encode request")
+		return
 	}
 
-	writeJSON(w, http.StatusOK, results)
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", h.producerURL+"/publish/bulk", bytes.NewReader(body))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create request")
+		return
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := h.httpClient.Do(httpReq)
+	if err != nil {
+		h.logger.ErrorContext(ctx, "producer HTTP call failed", "error", err)
+		writeError(w, http.StatusBadGateway, "producer unavailable")
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "failed to read producer response")
+		return
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		var errResp map[string]string
+		if json.Unmarshal(respBody, &errResp) == nil && errResp["error"] != "" {
+			writeError(w, resp.StatusCode, errResp["error"])
+		} else {
+			writeError(w, http.StatusBadGateway, "producer returned "+resp.Status)
+		}
+		return
+	}
+
+	var items []bulkPublishItem
+	if err := json.Unmarshal(respBody, &items); err != nil {
+		writeError(w, http.StatusBadGateway, "invalid producer response")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, items)
 }
 
 // --- Helpers ---

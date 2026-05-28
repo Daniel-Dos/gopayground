@@ -12,21 +12,20 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// DynamoDBTableAPI defines the interface for DynamoDB table operations.
-// It is satisfied by *dynamodb.Client and is compatible with the
-// DynamoDB waiter API for structural typing.
+// DynamoDBTableAPI define a interface para operações de tabela no DynamoDB.
+// É satisfeita por *dynamodb.Client e compatível com a API de waiter do DynamoDB.
 type DynamoDBTableAPI interface {
 	DescribeTable(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error)
 	CreateTable(ctx context.Context, params *dynamodb.CreateTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.CreateTableOutput, error)
 }
 
-// EnsureTable checks if the DynamoDB table exists and creates it if it
-// doesn't. It uses PAY_PER_REQUEST billing mode (on-demand) and waits
-// for the table to become ACTIVE before returning (up to 30s timeout).
+// EnsureTable verifica se a tabela DynamoDB existe e a cria caso não exista.
+// Usa o modo de faturamento PAY_PER_REQUEST (sob demanda) e aguarda
+// a tabela ficar ACTIVE antes de retornar (timeout de até 30s).
 //
-// The table schema matches the PaymentHistory model:
-//   - Partition key: payment_id (string)
-//   - Sort key:      timestamp  (string)
+// O esquema da tabela corresponde ao modelo PaymentHistory:
+//   - Chave de partição: payment_id (string)
+//   - Chave de ordenação: timestamp  (string)
 func EnsureTable(ctx context.Context, client DynamoDBTableAPI, tableName string, logger *slog.Logger) error {
 	// 1. Check if table already exists
 	_, err := client.DescribeTable(ctx, &dynamodb.DescribeTableInput{

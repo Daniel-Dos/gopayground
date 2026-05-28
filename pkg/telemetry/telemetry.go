@@ -18,11 +18,11 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// InitTracerProvider initializes an OTLP trace exporter and returns a TracerProvider.
+// InitTracerProvider inicializa um exportador de traces OTLP e retorna um TracerProvider.
 func InitTracerProvider(ctx context.Context, cfg config.Config) (*sdktrace.TracerProvider, error) {
 	res, err := resource.New(ctx,
 		resource.WithAttributes(
-			semconv.ServiceName(cfg.OTelServiceName),
+			semconv.ServiceName(cfg.OTel.ServiceName),
 		),
 	)
 	if err != nil {
@@ -30,7 +30,7 @@ func InitTracerProvider(ctx context.Context, cfg config.Config) (*sdktrace.Trace
 	}
 
 	traceExporter, err := otlptracegrpc.New(ctx,
-		otlptracegrpc.WithEndpoint(cfg.OTelEndpoint),
+		otlptracegrpc.WithEndpoint(cfg.OTel.Endpoint),
 		otlptracegrpc.WithInsecure(),
 		otlptracegrpc.WithTimeout(5*time.Second),
 	)
@@ -50,11 +50,11 @@ func InitTracerProvider(ctx context.Context, cfg config.Config) (*sdktrace.Trace
 	return tp, nil
 }
 
-// InitMeterProvider initializes an OTLP metric exporter and returns a MeterProvider.
+// InitMeterProvider inicializa um exportador de métricas OTLP e retorna um MeterProvider.
 func InitMeterProvider(ctx context.Context, cfg config.Config) (*sdkmetric.MeterProvider, error) {
 	res, err := resource.New(ctx,
 		resource.WithAttributes(
-			semconv.ServiceName(cfg.OTelServiceName),
+			semconv.ServiceName(cfg.OTel.ServiceName),
 		),
 	)
 	if err != nil {
@@ -62,7 +62,7 @@ func InitMeterProvider(ctx context.Context, cfg config.Config) (*sdkmetric.Meter
 	}
 
 	metricExporter, err := otlpmetricgrpc.New(ctx,
-		otlpmetricgrpc.WithEndpoint(cfg.OTelEndpoint),
+		otlpmetricgrpc.WithEndpoint(cfg.OTel.Endpoint),
 		otlpmetricgrpc.WithInsecure(),
 		otlpmetricgrpc.WithTimeout(5*time.Second),
 	)
@@ -81,12 +81,12 @@ func InitMeterProvider(ctx context.Context, cfg config.Config) (*sdkmetric.Meter
 	return mp, nil
 }
 
-// NewMeter creates a new named meter.
+// NewMeter cria um novo meter nomeado.
 func NewMeter(name string) metric.Meter {
 	return otel.Meter(name)
 }
 
-// NewTracer creates a new named tracer.
+// NewTracer cria um novo tracer nomeado.
 func NewTracer(name string) trace.Tracer {
 	return otel.Tracer(name)
 }
