@@ -35,20 +35,65 @@ O projeto possui 3 features implementadas com base em specs SDD (Spec Driven Dev
 
 ### Diagramas de Arquitetura
 
-O projeto inclui diagramas visuais no formato Excalidraw (`.excalidraw`). Abra-os em [https://excalidraw.com](https://excalidraw.com) para visualização interativa.
+Os diagramas abaixo ilustram a arquitetura e os fluxos do sistema.
+Os arquivos fonte em formato `.excalidraw` (editáveis no
+[Excalidraw](https://excalidraw.com)) estão disponíveis em `docs/diagrams/`.
 
-| Diagrama | Descrição | Arquivo |
-|----------|-----------|---------|
-| **Arquitetura Geral** | Visão completa do sistema: Kafka, Consumer, Redis, DynamoDB, UI, OTel | [`docs/diagrams/architecture-overview.excalidraw`](docs/diagrams/architecture-overview.excalidraw) |
-| **Fluxo de Processamento** | Pipeline do consumer: validação → idempotência → retry → DLQ | [`docs/diagrams/message-processing-flow.excalidraw`](docs/diagrams/message-processing-flow.excalidraw) |
-| **Event Bus** | Redis Pub/Sub: consumer → EventBus → SSE → Browser | [`docs/diagrams/event-bus-flow.excalidraw`](docs/diagrams/event-bus-flow.excalidraw) |
-| **Data Stores** | Schema Redis (status + idempotência) e DynamoDB (histórico) | [`docs/diagrams/data-stores.excalidraw`](docs/diagrams/data-stores.excalidraw) |
-| **Deploy Docker** | Topologia Docker Compose com portas e rede | [`docs/diagrams/deployment-architecture.excalidraw`](docs/diagrams/deployment-architecture.excalidraw) |
-| **Observabilidade** | Stack OTel: OTLP → Collector → Batch → Exporters | [`docs/diagrams/observability-stack.excalidraw`](docs/diagrams/observability-stack.excalidraw) |
+---
 
-### Diagrama ASCII (visão textual)
+#### Arquitetura Geral
+Visão completa do sistema: Kafka, Consumer, Redis, DynamoDB, UI, OTel
 
-Para uma versão visual interativa, abra o arquivo [`docs/diagrams/architecture-overview.excalidraw`](docs/diagrams/architecture-overview.excalidraw).
+<img src="docs/diagrams/architecture-overview.jpg" alt="Arquitetura Geral" width="700">
+
+Fonte: [`docs/diagrams/architecture-overview.excalidraw`](docs/diagrams/architecture-overview.excalidraw)
+
+---
+
+#### Fluxo de Processamento
+Pipeline do consumer: validacao → idempotencia → retry → DLQ
+
+<img src="docs/diagrams/message-processing-flow.jpg" alt="Fluxo de Processamento" width="700">
+
+Fonte: [`docs/diagrams/message-processing-flow.excalidraw`](docs/diagrams/message-processing-flow.excalidraw)
+
+---
+
+#### Event Bus
+Redis Pub/Sub: consumer → EventBus → SSE → Browser
+
+<img src="docs/diagrams/event-bus-flow.jpg" alt="Event Bus Flow" width="700">
+
+Fonte: [`docs/diagrams/event-bus-flow.excalidraw`](docs/diagrams/event-bus-flow.excalidraw)
+
+---
+
+#### Data Stores
+Schema Redis (status + idempotencia) e DynamoDB (historico)
+
+<img src="docs/diagrams/data-stores.jpg" alt="Data Stores" width="700">
+
+Fonte: [`docs/diagrams/data-stores.excalidraw`](docs/diagrams/data-stores.excalidraw)
+
+---
+
+#### Deploy Docker
+Topologia Docker Compose com portas e rede
+
+<img src="docs/diagrams/deployment-architecture.jpg" alt="Deploy Docker" width="700">
+
+Fonte: [`docs/diagrams/deployment-architecture.excalidraw`](docs/diagrams/deployment-architecture.excalidraw)
+
+---
+
+#### Observabilidade
+Stack OTel: OTLP → Collector → Batch → Exporters
+
+<img src="docs/diagrams/observability-stack.jpg" alt="Observabilidade" width="700">
+
+Fonte: [`docs/diagrams/observability-stack.excalidraw`](docs/diagrams/observability-stack.excalidraw)
+
+### Diagrama ASCII (visao textual)
 
 ```
  ┌─────────────────────────────────────────────────────────────────────┐
@@ -339,7 +384,7 @@ Configure via variáveis de ambiente (veja `docs/observability.md`).
 | `docs/ui.md`                        | Documentação completa da UI (API, páginas, exemplos curl) |
 | `docs/producer.md`                  | Documentação completa do producer (CLI + HTTP) |
 | `docs/features/cli-producer.md`     | Detalhes do modo CLI (publish) do producer |
-| `docs/diagrams/`             | Diagramas Excalidraw da arquitetura do projeto   |
+| `docs/diagrams/`             | Diagramas da arquitetura (JPG + fonte `.excalidraw`) |
 | `adrs/`                      | Architecture Decision Records (13 ADRs)          |
 | `specs/` (pastas)            | Specs SDD completas de cada feature              |
 

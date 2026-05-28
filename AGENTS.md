@@ -101,10 +101,10 @@ tarefa:
 |---|---|
 | Docker, Dockerfile, compose, container, imagem, build de imagem | `docker-specialist` |
 | Erro de compilação, código Go, teste, lint | `senior-engineer` |
-| Spec, arquitetura, design | `architect` |
+| Spec, arquitetura, design, ADR | `architect` |
 | Segurança, hardening, vulnerabilidade | `hardening-engineer` |
 | Revisão, code review, qualidade | `reviewer` |
-| Documentação, README, ADR | `documentation-writer` |
+| Documentação, README | `documentation-writer` |
 | GitHub, Actions, CI/CD, PR, release | `github-specialist` |
 | Frontend, UI, HTML, CSS, dashboard | `frontend-engineer` |
 | Relatório, métrica, Firecrawl | `dashboard-report-specialist` |
