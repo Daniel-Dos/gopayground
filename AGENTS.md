@@ -1,6 +1,8 @@
 # AGENTS.md
 
-Instruções para o agente principal. Versão em português (pt-BR).
+Instruções para o agente **Planner** (orquestrador principal). Este arquivo
+define as convenções e regras do projeto que o Planner deve usar ao criar
+planos e delegar tarefas.
 
 ## Regra de Idioma
 
@@ -8,63 +10,67 @@ Toda comunicação com o usuário, relatórios, documentação e comentários em
 código DEVEM ser em português (pt-BR). Código-fonte Go (nomes de variáveis,
 funções, tipos, testes) permanece em inglês — não traduzir.
 
-## Fluxo Obrigatório de Desenvolvimento
+## Pipeline de Desenvolvimento
 
-Toda feature, correção ou refatoração DEVE seguir esta ordem de papéis.
-Cada etapa é executada pelo subagent correspondente via `task` tool com
-`subagent_type`.
+Toda feature, correção ou refatoração DEVE seguir esta ordem. O Planner
+decide quais estágios incluir e delega cada um ao subagente correto.
 
 ```
-Architect
-    ↓  (cria specs em /specs/<id-feature>/)
-Senior Engineer
-    ↓  (implementa código e testes seguindo a spec)
-AI Engineering
-    ↓  (implementa pipelines de IA se aplicável)
-Hardening Engineer
-    ↓  (valida resiliência, concorrência, segurança)
-Reviewer
-    ↓  (revisa aderência à spec e qualidade)
-Technical Writer
-    ↓  (documenta o que foi construído)
-Docker Specialist
-    ↓  (cria/mantém Dockerfiles e docker-compose)
-GitHub Specialist
-    ↓  (configura repositório, CI/CD, PRs)
-Frontend Engineer
-    ↓  (interfaces web, dashboards)
-Dashboard & Report Specialist
-    ↓  (relatórios HTML, extração de métricas)
+Planner (orquestra)
+  ├── 1. Architect        (spec em /specs/<id>/)
+  ├── 2. Senior Engineer  (código + testes)
+  ├── 3. AI Engineering   (IA/LLM/RAG — opcional)
+  ├── 4. Hardening Engineer (resiliência, segurança)
+  ├── 5. Reviewer         (revisão de aderência)
+  ├── 6. Documentation Writer (documentação)
+  ├── 7. Docker Specialist (Docker — opcional)
+  ├── 8. GitHub Specialist (CI/CD, PR — opcional)
+  ├── 9. Frontend Engineer (UI web — opcional)
+  └── 10. Dashboard & Report Specialist (relatórios — opcional)
 ```
 
-> Regra: nenhuma implementação começa sem spec aprovada.
+> Regra: nenhuma implementação começa sem spec aprovada pelo usuário.
 
-## Skills stack
+## Subagentes Disponíveis
 
-Skills são carregadas com o `skill` tool **antes** de iniciar qualquer
-trabalho relevante. Usar os `name:` abaixo (correspondem ao campo `name:`
-no frontmatter de cada `SKILL.md`):
+| Nome (`subagent_type`) | Arquivo | Responsabilidade |
+|---|---|---|
+| `architect` | `.opencode/agents/architect.md` | Criar specs SDD |
+| `senior-engineer` | `.opencode/agents/senior-engineer.md` | Implementar código Go |
+| `ai-engineering` | `.opencode/agents/ai-engineering.md` | Pipelines de IA |
+| `hardening-engineer` | `.opencode/agents/hardening-engineer.md` | Hardening e resiliência |
+| `reviewer` | `.opencode/agents/reviewer.md` | Revisão de qualidade |
+| `documentation-writer` | `.opencode/agents/documentation-writer.md` | Documentação técnica |
+| `docker-specialist` | `.opencode/agents/docker-specialist.md` | Docker e compose |
+| `github-specialist` | `.opencode/agents/github-specialist.md` | GitHub, CI/CD, PR |
+| `frontend-engineer` | `.opencode/agents/frontend-engineer.md` | Interfaces web |
+| `dashboard-report-specialist` | `.opencode/agents/dashboard-report-specialist.md` | Dashboards HTML |
 
-| Skill `name:` | Quando carregar |
-|---|---|
-| `golang-pro` | Implementação/refatoração Go |
-| `senior-software-engineer` | Revisão de código, debugging |
-| `software-architecture` | Design arquitetural, análise de código |
-| `software-architecture-design` | Decisões de estrutura de sistema |
-| `distributed-systems` | Padrões de sistemas distribuídos |
-| `kafka-development` | Configuração/uso de Kafka |
-| `pulsar` | Configuração/uso de Pulsar |
-| `security-and-hardening` | Hardening, validação de segurança |
-| `code-review-checklist` | Revisão de código |
-| `openspec-implementation` | Criação de specs SDD |
-| `technical-writing` | Documentação técnica |
-| `ai-engineer` | Pipelines de IA, RAG, agents |
-| `docker-expert` | Docker, Docker Compose |
-| `build-dashboard` | Dashboards HTML interativos |
-| `firecrawl-dashboard-reporting` | Extração de métricas via Firecrawl |
-| `frontend-design` | Interfaces web, HTML/CSS/JS |
-| `excalidraw-diagram-generator` | Diagramas de arquitetura |
-| `documentation-and-adrs` | ADRs, registros de decisão |
+## Skills Stack
+
+Carregar com `skill` tool **antes** de delegar tarefas a cada subagente.
+Use o `name:` exato da skill (coluna da esquerda):
+
+| Skill `name:` | Quem carrega | Quando |
+|---|---|---|
+| `golang-pro` | senior-engineer | Implementação Go |
+| `senior-software-engineer` | senior-engineer, reviewer | Qualidade de código |
+| `software-architecture` | architect | Design arquitetural |
+| `software-architecture-design` | architect | Decisões de estrutura |
+| `distributed-systems` | architect, senior-engineer, hardening, reviewer | Padrões distribuídos |
+| `kafka-development` | senior-engineer, hardening | Se usar Kafka |
+| `pulsar` | senior-engineer, hardening | Se usar Pulsar |
+| `security-and-hardening` | hardening-engineer, reviewer | Hardening e segurança |
+| `code-review-checklist` | reviewer | Revisão de código |
+| `openspec-implementation` | architect | Criação de specs SDD |
+| `technical-writing` | documentation-writer | Documentação técnica |
+| `ai-engineer` | ai-engineering | Pipelines de IA |
+| `docker-expert` | docker-specialist | Docker, compose |
+| `build-dashboard` | dashboard-report-specialist | Dashboards HTML |
+| `firecrawl-dashboard-reporting` | dashboard-report-specialist | Extração de métricas |
+| `frontend-design` | frontend-engineer | Interfaces web |
+| `excalidraw-diagram-generator` | documentation-writer | Diagramas de arquitetura |
+| `documentation-and-adrs` | architect | ADRs e decisões |
 
 ## Convenções Técnicas (Go)
 
@@ -89,35 +95,3 @@ Toda feature deve ter:
 - Tratamento de erro em todas as operações
 - Estratégia de retry com timeout explícito
 - Proteção contra falha parcial
-
-## Roteamento Automático de Subagentes
-
-O usuário NUNCA deve precisar usar `@<subagent>` ou especificar manualmente
-qual subagente chamar. O agente principal DEVE analisar automaticamente cada
-mensagem do usuário e delegar ao subagente correto com base no domínio da
-tarefa:
-
-| Se a mensagem menciona... | Roteie para... |
-|---|---|
-| Docker, Dockerfile, compose, container, imagem, build de imagem | `docker-specialist` |
-| Erro de compilação, código Go, teste, lint | `senior-engineer` |
-| Spec, arquitetura, design, ADR | `architect` |
-| Segurança, hardening, vulnerabilidade | `hardening-engineer` |
-| Revisão, code review, qualidade | `reviewer` |
-| Documentação, README | `documentation-writer` |
-| GitHub, Actions, CI/CD, PR, release | `github-specialist` |
-| Frontend, UI, HTML, CSS, dashboard | `frontend-engineer` |
-| Relatório, métrica, Firecrawl | `dashboard-report-specialist` |
-| IA, LLM, RAG, embedding, pipeline de IA | `ai-engineering` |
-
-Regras:
-- Antes de qualquer ação direta (editar código, rodar comandos), PARE e
-  avalie se a tarefa pertence a um subagente. Se sim, delegue via `task`.
-- Se houver dúvida entre múltiplos subagentes, delegue ao mais específico.
-- Se a tarefa claramente não se encaixa em nenhum subagente, execute
-  diretamente.
-
-## Arquivos de Agentes
-
-Os prompts detalhados de cada papel estão em `.opencode/agents/<nome>.md`.
-Sempre passar o contexto relevante ao subagent ao delegar a tarefa.
