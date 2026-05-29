@@ -1,10 +1,15 @@
 # OpenCode Review — Revisao automatizada de Pull Requests
-# Executa OpenCode review quando um PR e aberto ou atualizado
+# Acionado por PR events (auto) ou workflow_dispatch (via ci.yml)
 name: OpenCode Review
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr-number:
+        description: 'Numero do PR para revisar'
+        required: true
 
 permissions:
   contents: read
@@ -12,19 +17,32 @@ permissions:
   id-token: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{
+    github.event.pull_request.number ||
+    github.event.inputs.pr-number }}
   cancel-in-progress: true
 
 jobs:
   review:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    if: github.event.pull_request.base.ref == 'develop'
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop') ||
+      (github.event_name == 'workflow_dispatch')
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
           fetch-depth: 0
+
+      - name: Set PR info
+        id: pr-info
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "number=${{ github.event.inputs.pr-number }}" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: anomalyco/opencode/github@latest
         env:
@@ -34,9 +52,14 @@ jobs:
           model: opencode/deepseek-v4-flash-free
           use_github_token: true
           prompt: |
+            PR_NUMBER=${{ steps.pr-info.outputs.number }}
+
             Voce e um revisor de codigo Go para o projeto gopayground.
 
-            Revise APENAS as linhas alteradas neste PR (diff). Nao revise o codigo todo.
+            Obtenha o diff do PR com: gh pr diff $PR_NUMBER --repo ${{ github.repository }}
+            Revise APENAS as linhas alteradas neste PR. Nao revise o codigo todo.
+
+            Criterios:
             - Qualidade do codigo Go (idiomatico, erros com fmt.Errorf, context.Context)
             - Testes acompanham as alteracoes?
             - Tratamento de erros e timeouts
@@ -50,14 +73,14 @@ jobs:
 
             Se nao houver BLOQUEADORES, aprove o PR no final.
             Se houver BLOQUEADORES, NAO aprove — liste-os claramente.
-            Poste o resumo como comentario no PR.
+            Poste o resumo como comentario no PR #$PR_NUMBER.
 
       - name: Approve PR after successful review
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr-info.outputs.number }}
         run: |
-          PR_NUMBER="${{ github.event.pull_request.number }}"
           if [ -n "$PR_NUMBER" ]; then
             gh pr review "$PR_NUMBER" --approve --body "✅ Revisao OpenCode concluida sem bloqueadores. Aprovado."
             echo "PR #$PR_NUMBER aprovado via OpenCode review."
