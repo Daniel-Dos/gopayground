@@ -28,21 +28,29 @@ jobs:
       id-token: write
       contents: read
       pull-requests: read
-      issues: read
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
+      - name: Set PR number for workflow_dispatch
+        id: pr-info
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "number=${{ github.event.inputs.pr-number }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           model: opencode/big-pickle
-          use_github_token: true
           prompt: |
-            Revise este pull request (Go 1.26):
+            PR=${{ steps.pr-info.outputs.number }}
+
+            Revise este pull request #$PR (Go 1.26):
             - Verifique qualidade do codigo Go (idiomatico, erros com fmt.Errorf, context.Context)
             - Testes acompanham as alteracoes?
             - Tratamento de erros e timeouts
