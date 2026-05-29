@@ -11,7 +11,7 @@ import (
 
 // ServerConfig contém configurações do servidor HTTP.
 type ServerConfig struct {
-	Port                   int           `mapstructure:"port"`
+	Port                    int           `mapstructure:"port"`
 	GracefulShutdownTimeout time.Duration `mapstructure:"graceful_shutdown_timeout"`
 }
 

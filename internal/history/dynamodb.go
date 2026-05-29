@@ -48,8 +48,8 @@ func (dr *dynamoRecorder) RecordHistory(ctx context.Context, event *models.Payme
 	}
 
 	_, err = dr.client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(dr.table),
-		Item:      item,
+		TableName:           aws.String(dr.table),
+		Item:                item,
 		ConditionExpression: aws.String("attribute_not_exists(payment_id) AND attribute_not_exists(#ts)"),
 		ExpressionAttributeNames: map[string]string{
 			"#ts": "timestamp",

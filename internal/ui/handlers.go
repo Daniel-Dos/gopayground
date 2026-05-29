@@ -224,7 +224,7 @@ func (h *Handlers) HandlePaymentHistory(w http.ResponseWriter, r *http.Request) 
 	var historyItems []models.PaymentHistory
 
 	result, err := h.dynamo.Query(ctx, &dynamodb.QueryInput{
-		TableName: aws.String(h.dynamoTbl),
+		TableName:              aws.String(h.dynamoTbl),
 		KeyConditionExpression: aws.String("payment_id = :pid"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":pid": &types.AttributeValueMemberS{Value: paymentID},
