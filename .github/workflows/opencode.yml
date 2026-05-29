@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -26,5 +27,15 @@ jobs:
       - uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           model: opencode/deepseek-v4-flash-free
+          use_github_token: true
+      - name: Approve PR after review
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -n "${{ github.event.issue.number }}" ]; then
+            gh pr review "${{ github.event.issue.number }}" --approve --body "✅ Review automatizado pelo OpenCode concluido."
+            echo "PR #${{ github.event.issue.number }} aprovado."
+          fi

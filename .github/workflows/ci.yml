@@ -64,7 +64,7 @@ jobs:
     needs: build
     if: github.ref_name != 'master' && github.ref_name != 'develop' && !contains(github.ref_name, '/merge')
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 5
     continue-on-error: true
     steps:
       - name: Checkout
@@ -112,24 +112,7 @@ jobs:
             PR_NUM=$(echo "$PR_URL" | grep -oP '\d+$')
             echo "PR criado: #$PR_NUM"
             echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
+            gh pr comment "$PR_NUM" --body "/oc review"
+            echo "Comentario /oc review postado no PR #$PR_NUM"
           fi
-      - name: Post review request comment
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ steps.create-pr.outputs.pr_number }}
-        run: |
-          if [ -n "$PR_NUMBER" ]; then
-            cat > /tmp/review-comment.md <<- 'EOF'
-            ## Revisão necessária
 
-            Este PR foi criado automaticamente pelo CI apos todos os checks passarem (lint + test + build).
-
-            ### Antes de fazer o merge
-            - Revise as alteracoes neste PR
-            - Verifique se atende aos criterios de qualidade
-            - Aprove ou solicite alteracoes
-
-            > O merge depende de aprovacao manual.
-            EOF
-            gh pr comment "$PR_NUMBER" --body "$(cat /tmp/review-comment.md)"
-          fi
