@@ -111,38 +111,38 @@ jobs:
 
           FILES_CHANGED=$(echo "$FILES_JSON" | jq -r '.files[] | "- \(.path) (\(.additions) adicoes, \(.deletions) remocoes)"' 2>/dev/null || echo "N/A")
 
-          cat > /tmp/pr_body_master.md << BODYEOF
-## 🤖 PR gerado automaticamente para master
-
-Este PR foi criado automaticamente apos o merge do PR #${PR_NUMBER_SRC} em \`develop\`.
-
-### Origem
-
-| Item | Detalhe |
-|------|---------|
-| **Tipo** | $PREFIX |
-| **Branch de origem** | $HEAD_REF |
-| **Merge commit** | $MERGE_COMMIT |
-| **Merge realizado em** | $MERGED_AT |
-| **PR original** | #${PR_NUMBER_SRC} — $PR_TITLE_SRC |
-
-### Changelog (commits do PR original)
-
-${CHANGELOG}
-
-### Arquivos alterados
-
-${FILES_CHANGED}
-
-### Revisao necessaria
-
-⚠️ Este PR precisa ser revisado e aprovado antes do merge em \`master\`.
-O CI ja foi executado na branch de origem (PR #${PR_NUMBER_SRC}).
-
----
-
-*PR gerado automaticamente pelo workflow \`Auto-PR to Master\`.*
-BODYEOF
+          {
+            echo "## 🤖 PR gerado automaticamente para master"
+            echo ""
+            echo "Este PR foi criado automaticamente apos o merge do PR #${PR_NUMBER_SRC} em develop."
+            echo ""
+            echo "### Origem"
+            echo ""
+            echo "| Item | Detalhe |"
+            echo "|------|---------|"
+            echo "| **Tipo** | $PREFIX |"
+            echo "| **Branch de origem** | $HEAD_REF |"
+            echo "| **Merge commit** | $MERGE_COMMIT |"
+            echo "| **Merge realizado em** | $MERGED_AT |"
+            echo "| **PR original** | #${PR_NUMBER_SRC} - $PR_TITLE_SRC |"
+            echo ""
+            echo "### Changelog (commits do PR original)"
+            echo ""
+            echo "$CHANGELOG"
+            echo ""
+            echo "### Arquivos alterados"
+            echo ""
+            echo "$FILES_CHANGED"
+            echo ""
+            echo "### Revisao necessaria"
+            echo ""
+            echo ":warning: Este PR precisa ser revisado e aprovado antes do merge em master."
+            echo "O CI ja foi executado na branch de origem (PR #${PR_NUMBER_SRC})."
+            echo ""
+            echo "---"
+            echo ""
+            echo "*PR gerado automaticamente pelo workflow Auto-PR to Master.*"
+          } > /tmp/pr_body_master.md
 
           echo "body_file=/tmp/pr_body_master.md" >> "$GITHUB_OUTPUT"
 

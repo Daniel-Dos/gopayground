@@ -109,33 +109,33 @@ jobs:
             CHANGED_FILES=$(git diff --name-only origin/develop...HEAD 2>/dev/null || echo "N/A")
             COMMIT_LOG=$(git log origin/develop...HEAD --oneline --no-decorate 2>/dev/null || echo "N/A")
 
-            cat > /tmp/pr_body.md << BODYEOF
-## 🤖 PR gerado automaticamente
-
-| Item | Detalhe |
-|------|---------|
-| **Tipo** | $PREFIX |
-| **Branch** | $BRANCH |
-| **Base** | develop |
-| **Commit** | $SHORT_SHA |
-
-### Commits
-$COMMIT_LOG
-
-### Arquivos alterados
-$CHANGED_FILES
-
-### Status do CI
-✅ Lint — golangci-lint passou
-✅ Testes — make test passou
-✅ Build — make build compilou
-
-### Revisao
-Aguardando revisao automatizada do OpenCode (dispara no proximo push).
-
----
-*Este PR foi gerado automaticamente pelo pipeline CI.*
-BODYEOF
+            {
+              echo "## 🤖 PR gerado automaticamente"
+              echo ""
+              echo "| Item | Detalhe |"
+              echo "|------|---------|"
+              echo "| **Tipo** | $PREFIX |"
+              echo "| **Branch** | $BRANCH |"
+              echo "| **Base** | develop |"
+              echo "| **Commit** | $SHORT_SHA |"
+              echo ""
+              echo "### Commits"
+              echo "$COMMIT_LOG"
+              echo ""
+              echo "### Arquivos alterados"
+              echo "$CHANGED_FILES"
+              echo ""
+              echo "### Status do CI"
+              echo ":white_check_mark: Lint - golangci-lint passou"
+              echo ":white_check_mark: Testes - make test passou"
+              echo ":white_check_mark: Build - make build compilou"
+              echo ""
+              echo "### Revisao"
+              echo "Aguardando revisao automatizada do OpenCode (dispara no proximo push)."
+              echo ""
+              echo "---"
+              echo "*Este PR foi gerado automaticamente pelo pipeline CI.*"
+            } > /tmp/pr_body.md
 
             PR_URL=$(gh pr create \
               --base develop \
