@@ -1,65 +1,42 @@
-# OpenCode Integration — Executa comandos OpenCode via comentários
-# Acionado quando um comentário contém /oc ou /opencode
+# OpenCode — Revisao de PRs e comandos manuais
+# Segue o padrao: https://github.com/Daniel-Dos/rust-ai/blob/master/.github/workflows/opencode.yml
 name: opencode
+
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
   issue_comment:
     types: [created]
   pull_request_review_comment:
     types: [created]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.issue.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   opencode:
     if: |
-      contains(github.event.comment.body, '/oc') ||
-      contains(github.event.comment.body, '/opencode')
+      github.event_name == 'pull_request' ||
+      contains(github.event.comment.body, ' /oc') ||
+      startsWith(github.event.comment.body, '/oc') ||
+      contains(github.event.comment.body, ' /opencode') ||
+      startsWith(github.event.comment.body, '/opencode')
     runs-on: ubuntu-latest
     permissions:
       id-token: write
+      contents: read
       pull-requests: write
+      issues: write
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+
       - uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: opencode/deepseek-v4-flash-free
-          use_github_token: true
+          model: opencode/big-pickle
           prompt: |
-            Voce e um revisor de codigo para o projeto gopayground (Go 1.26).
-
-            Quando alguem escrever "/oc review" ou "/oc review this PR", voce DEVE:
-
-            1. Identificar o numero do PR usando a variavel ISSUE_NUMBER
-            2. Obter o diff do PR com: gh pr view NUMERO --json title,body,files
-            3. Para cada arquivo alterado, obter o diff com: gh pr diff NUMERO
-            4. Revisar APENAS as linhas alteradas no PR (nao o projeto inteiro)
-            5. Postar um comentario no PR com o resultado da revisao
-
-            Criterios de revisao:
-            - Qualidade do codigo Go (idiomatico, erros com fmt.Errorf, context.Context)
-            - Testes acompanham as alteracoes?
-            - Tratamento de erros e timeouts (sistemas distribuidos)
-            - Logs estruturados nos pontos criticos
-            - Seguranca basica (vazamento de informacao, injecao)
-
-            Classifique cada problema como:
-            - BLOQUEADOR: impede o merge (bug, seguranca)
-            - ATENCAO: deve ser corrigido
-            - SUGESTAO: melhoria opcional
-
-            Apos revisar, poste o resumo como comentario no PR e conclua.
-      - name: Approve PR after review
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [ -n "${{ github.event.issue.number }}" ]; then
-            gh pr review "${{ github.event.issue.number }}" --approve --body "✅ Review automatizado pelo OpenCode concluido."
-            echo "PR #${{ github.event.issue.number }} aprovado."
-          fi
+            ${{ github.event_name == 'pull_request' && 'Revise este pull request (Go 1.26): verifique qualidade, bugs e sugira melhorias. Se nao houver bloqueadores, aprove o PR.' || github.event.comment.body }}
