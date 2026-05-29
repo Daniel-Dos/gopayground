@@ -55,6 +55,18 @@ Planner (orquestra)
 
 > Regra: nenhuma implementação começa sem spec aprovada pelo usuário.
 
+### Verificação de Aderência ao Pipeline
+
+Após finalizar uma demanda (feature, bugfix, refactor), o Planner DEVE:
+
+1. Chamar o **reviewer** para verificar se todas as etapas do pipeline foram delegadas corretamente
+2. O reviewer analisa:
+   - O plano em `/plans/<id>/plan.md` corresponde ao que foi executado?
+   - Todas as etapas aplicáveis foram delegadas ao subagente correto?
+   - O Planner executou alguma tarefa diretamente (via `edit`, `write`, `bash`) que deveria ter sido delegada?
+3. Se o reviewer encontrar violações, o Planner DEVE corrigir antes de dar a demanda como concluída
+4. O resultado da verificação é reportado ao usuário junto com o resumo final
+
 ## Subagentes Disponíveis
 
 | Nome (`subagent_type`) | Arquivo | Responsabilidade |
@@ -63,7 +75,7 @@ Planner (orquestra)
 | `senior-engineer` | `.opencode/agents/senior-engineer.md` | Implementar código Go |
 | `ai-engineering` | `.opencode/agents/ai-engineering.md` | Pipelines de IA |
 | `hardening-engineer` | `.opencode/agents/hardening-engineer.md` | Hardening e resiliência |
-| `reviewer` | `.opencode/agents/reviewer.md` | Revisão de qualidade |
+| `reviewer` | `.opencode/agents/reviewer.md` | Revisão de qualidade e aderência ao pipeline |
 | `documentation-writer` | `.opencode/agents/documentation-writer.md` | Documentação técnica |
 | `docker-specialist` | `.opencode/agents/docker-specialist.md` | Docker e compose |
 | `github-specialist` | `.opencode/agents/github-specialist.md` | GitHub, CI/CD, PR |
