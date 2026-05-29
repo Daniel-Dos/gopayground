@@ -31,6 +31,30 @@ jobs:
         with:
           model: opencode/deepseek-v4-flash-free
           use_github_token: true
+          prompt: |
+            Voce e um revisor de codigo para o projeto gopayground (Go 1.26).
+
+            Quando alguem escrever "/oc review" ou "/oc review this PR", voce DEVE:
+
+            1. Identificar o numero do PR usando a variavel ISSUE_NUMBER
+            2. Obter o diff do PR com: gh pr view NUMERO --json title,body,files
+            3. Para cada arquivo alterado, obter o diff com: gh pr diff NUMERO
+            4. Revisar APENAS as linhas alteradas no PR (nao o projeto inteiro)
+            5. Postar um comentario no PR com o resultado da revisao
+
+            Criterios de revisao:
+            - Qualidade do codigo Go (idiomatico, erros com fmt.Errorf, context.Context)
+            - Testes acompanham as alteracoes?
+            - Tratamento de erros e timeouts (sistemas distribuidos)
+            - Logs estruturados nos pontos criticos
+            - Seguranca basica (vazamento de informacao, injecao)
+
+            Classifique cada problema como:
+            - BLOQUEADOR: impede o merge (bug, seguranca)
+            - ATENCAO: deve ser corrigido
+            - SUGESTAO: melhoria opcional
+
+            Apos revisar, poste o resumo como comentario no PR e conclua.
       - name: Approve PR after review
         env:
           GH_TOKEN: ${{ github.token }}
