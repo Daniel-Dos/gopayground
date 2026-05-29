@@ -9,6 +9,10 @@ on:
   pull_request_review_comment:
     types: [created]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   opencode:
     if: |
@@ -20,6 +24,7 @@ jobs:
       contains(github.event.comment.body, ' /run') ||
       startsWith(github.event.comment.body, '/run')
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       id-token: write
       contents: read
@@ -31,40 +36,39 @@ jobs:
         uses: actions/checkout@v6
         with:
           persist-credentials: false
+          fetch-depth: 0
 
-      - name: Setup Docker
-        uses: docker/setup-buildx-action@v3
+      # Extrai arquivos alterados usando tj-actions e passa a lista no prompt
+      # para o OpenCode focar apenas nos arquivos relevantes do PR
+      - name: Get changed files
+        id: changed-files
+        if: |
+          github.event_name == 'pull_request' ||
+          (github.event_name == 'pull_request_review_comment' && github.event.pull_request)
+        uses: tj-actions/changed-files@v46
+        continue-on-error: true
 
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Start Kafka (KRaft mode)
+      - name: Prepare prompt
+        id: prompt
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
-          docker run --rm -d \
-            -p 9092:9092 \
-            --name kafka-server \
-            -e KAFKA_PROCESS_ROLES=broker,controller \
-            -e KAFKA_NODE_ID=1 \
-            -e KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093 \
-            -e CLUSTER_ID=abcdefghijklmnopqrstuv \
-            -e KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER \
-            -e KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093 \
-            -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092 \
-            -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT \
-            -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
-            -e KAFKA_AUTO_CREATE_TOPICS_ENABLE=true \
-            -e KAFKA_NUM_PARTITIONS=3 \
-            apache/kafka:3.9.0
-
-      - name: Start Redis
-        run: |
-          docker run --rm -d -p 6379:6379 --name redis-server redis:7-alpine
-
-      - name: Build
-        run: make build build-ui build-producer
+          if [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.event_name }}" = "pull_request_review_comment" ]; then
+            FILES="${{ steps.changed-files.outputs.all_changed_files }}"
+            echo "prompt<<OPROMPT_END" >> $GITHUB_OUTPUT
+            echo "Revise este Pull Request. Os arquivos alterados sao:" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            for f in $FILES; do
+              echo "- $f" >> $GITHUB_OUTPUT
+            done
+            echo "" >> $GITHUB_OUTPUT
+            echo "Analise cada arquivo alterado listado acima e forneca sugestoes de melhoria." >> $GITHUB_OUTPUT
+            echo "OPROMPT_END" >> $GITHUB_OUTPUT
+          else
+            echo "prompt<<OPROMPT_END" >> $GITHUB_OUTPUT
+            echo "$COMMENT_BODY" >> $GITHUB_OUTPUT
+            echo "OPROMPT_END" >> $GITHUB_OUTPUT
+          fi
 
       - name: Run opencode
         uses: anomalyco/opencode/github@latest
@@ -72,6 +76,4 @@ jobs:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         with:
           model: opencode/big-pickle
-          prompt: |
-            ${{ github.event_name == 'pull_request' && 'Execute o /run' || github.event.comment.body }}
-            ${{ github.event_name != 'pull_request' && contains(github.event.comment.body, '/run') && 'Execute o /run' || '' }}
+          prompt: ${{ steps.prompt.outputs.prompt }}
