@@ -1,18 +1,24 @@
 # Configuração do golangci-lint
-# Documentação: https://golangci-lint.run/
+# Documentação: https://golangci-lint.run/docs/configuration/file/
 version: "2"
 
 linters:
   default: standard
   disable:
     - errcheck
-
-issues:
-  exclude:
-    - "Error return value of .* is not checked"
-    - "SA1019:" # deprecated API usage
-    - "S1008:"  # simplify if/return
-    - "is unused" # unused variable
+  exclusions:
+    rules:
+      # Exclui warnings específicos do staticcheck
+      - linters:
+          - staticcheck
+        text: "SA1019:"
+      - linters:
+          - staticcheck
+        text: "S1008:"
+      # Exclui variáveis não utilizadas (serão limpas gradualmente)
+      - linters:
+          - unused
+        text: "is unused"
 
 formatters:
   enable:
