@@ -151,21 +151,7 @@ jobs:
             BODY="${BODY/3./3. Executar \`make test\` e \`make build\` localmente}"
 
             # Preenche "Observacoes" com o resumo dos commits e CI
-            OBS="**Commits:**
-\`\`\`
-$COMMITS
-\`\`\`
-
-**Arquivos alterados:**
-\`\`\`
-$FILES_STATS
-\`\`\`
-
-**CI:** ✅ Lint (golangci-lint) | ✅ Testes (make test) | ✅ Build (make build)
-
----
-
-> Para revisao automatizada, comente \`/oc review\` neste PR."
+            OBS=$(printf '**Commits:**\n```\n%s\n```\n\n**Arquivos alterados:**\n```\n%s\n```\n\n**CI:** ✅ Lint (golangci-lint) | ✅ Testes (make test) | ✅ Build (make build)\n\n---\n\n> Para revisao automatizada, comente \`/oc review\` neste PR.' "$COMMITS" "$FILES_STATS")
             BODY="${BODY/<!-- Informações adicionais que o revisor precisa saber -->/$OBS}"
 
             printf '%s\n' "$BODY" > /tmp/pr_body.md
