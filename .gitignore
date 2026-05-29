@@ -18,6 +18,7 @@ data/*
 *.swp
 *.swo
 *~
+plans/*
 
 # --- OS ---
 .DS_Store
