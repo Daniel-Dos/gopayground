@@ -156,7 +156,7 @@ jobs:
           PR_NUM="${{ steps.create-pr.outputs.pr_number }}"
           echo "Disparando OpenCode review para PR #$PR_NUM..."
           gh workflow run opencode-review.yml \
-            --ref develop \
+            --ref "${{ github.ref_name }}" \
             -f pr-number="$PR_NUM" \
             2>&1
           echo "Workflow dispatch enviado para opencode-review.yml (PR #$PR_NUM)."
