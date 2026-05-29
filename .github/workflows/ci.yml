@@ -1,8 +1,10 @@
 # CI — Pipeline de integração contínua
-# Executa lint, testes e build em qualquer push (não master/develop)
+# Executa lint, testes e build em qualquer push (exceto master)
 name: CI
 on:
   push:
+    branches-ignore:
+      - master
 
 permissions:
   contents: read
