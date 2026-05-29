@@ -1,5 +1,5 @@
 # OpenCode Review — Revisao automatizada de Pull Requests
-# Acionado por PR events (auto) ou workflow_dispatch (via ci.yml)
+# Segue o padrao da doc: https://opencode.ai/docs/pt-br/github/#exemplo-de-pull-request
 name: OpenCode Review
 
 on:
@@ -11,11 +11,6 @@ on:
         description: 'Numero do PR para revisar'
         required: true
 
-permissions:
-  contents: read
-  pull-requests: write
-  id-token: write
-
 concurrency:
   group: ${{ github.workflow }}-${{
     github.event.pull_request.number ||
@@ -25,63 +20,35 @@ concurrency:
 jobs:
   review:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     if: |
       (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop') ||
       (github.event_name == 'workflow_dispatch')
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: read
+      issues: read
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-          fetch-depth: 0
-
-      - name: Set PR info
-        id: pr-info
-        run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "number=${{ github.event.inputs.pr-number }}" >> "$GITHUB_OUTPUT"
-          fi
 
       - uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: opencode/deepseek-v4-flash-free
+          model: opencode/big-pickle
           use_github_token: true
           prompt: |
-            PR_NUMBER=${{ steps.pr-info.outputs.number }}
-
-            Voce e um revisor de codigo Go para o projeto gopayground.
-
-            Obtenha o diff do PR com: gh pr diff $PR_NUMBER --repo ${{ github.repository }}
-            Revise APENAS as linhas alteradas neste PR. Nao revise o codigo todo.
-
-            Criterios:
-            - Qualidade do codigo Go (idiomatico, erros com fmt.Errorf, context.Context)
+            Revise este pull request (Go 1.26):
+            - Verifique qualidade do codigo Go (idiomatico, erros com fmt.Errorf, context.Context)
             - Testes acompanham as alteracoes?
             - Tratamento de erros e timeouts
             - Logs estruturados nos pontos criticos
-            - Seguranca basica (vazamento de informacao, injecao)
+            - Seguranca basica
 
-            Classifique cada problema como:
-            - BLOQUEADOR: impede o merge (bug, seguranca)
-            - ATENCAO: deve ser corrigido
-            - SUGESTAO: melhoria opcional
-
-            Se nao houver BLOQUEADORES, aprove o PR no final.
-            Se houver BLOQUEADORES, NAO aprove — liste-os claramente.
-            Poste o resumo como comentario no PR #$PR_NUMBER.
-
-      - name: Approve PR after successful review
-        if: success()
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ steps.pr-info.outputs.number }}
-        run: |
-          if [ -n "$PR_NUMBER" ]; then
-            gh pr review "$PR_NUMBER" --approve --body "✅ Revisao OpenCode concluida sem bloqueadores. Aprovado."
-            echo "PR #$PR_NUMBER aprovado via OpenCode review."
-          fi
+            Classifique como: BLOQUEADOR, ATENCAO ou SUGESTAO.
+            Se nao houver BLOQUEADORES, aprove o PR.
+            Poste o resumo como comentario no PR.
