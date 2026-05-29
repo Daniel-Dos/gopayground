@@ -3,12 +3,12 @@
 name: CI
 on:
   push:
-    branches: [master]
   pull_request:
     branches: [master]
 
 permissions:
   contents: read
+  pull-requests: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -61,3 +61,34 @@ jobs:
           cache: true
       - name: Build
         run: make build build-ui build-producer
+
+  auto-pr:
+    needs: build
+    if: github.ref_name != 'master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Create PR if not exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          echo "Branch: $BRANCH"
+          EXISTING=$(gh pr list --head "$BRANCH" --state open --json number --jq 'length' 2>/dev/null || echo "0")
+          if [ "$EXISTING" -gt 0 ]; then
+            echo "PR já existe para branch '$BRANCH' — nenhuma ação necessária."
+          else
+            echo "Nenhum PR aberto encontrado. Criando PR..."
+            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+            TITLE="[auto-pr] $BRANCH ($SHORT_SHA)"
+            gh pr create \
+              --base master \
+              --head "$BRANCH" \
+              --title "$TITLE" \
+              --body "$(printf '## 🤖 PR gerado automaticamente pelo CI\n\n**Branch:** %s\n**Commit:** %s\n\nEste PR foi criado automaticamente apos o pipeline CI ser aprovado.\n\n> ⚠️ Revise as alteracoes antes de fazer o merge.' "$BRANCH" "${{ github.sha }}")"
+          fi
