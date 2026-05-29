@@ -57,11 +57,11 @@ func TestRecordHistory_Duplicate(t *testing.T) {
 
 	recorder := history.NewRecorder(client, "payment_history")
 	event := &models.PaymentEvent{
-		PaymentID:   "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-		Status:      "confirmed",
-		Amount:      100.0,
-		Currency:    "USD",
-		Timestamp:   "2026-05-24T10:00:00Z",
+		PaymentID: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+		Status:    "confirmed",
+		Amount:    100.0,
+		Currency:  "USD",
+		Timestamp: "2026-05-24T10:00:00Z",
 	}
 
 	err := recorder.RecordHistory(context.Background(), event)
@@ -77,11 +77,11 @@ func TestRecordHistory_DynamoDBError(t *testing.T) {
 
 	recorder := history.NewRecorder(client, "payment_history")
 	event := &models.PaymentEvent{
-		PaymentID:   "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-		Status:      "confirmed",
-		Amount:      100.0,
-		Currency:    "USD",
-		Timestamp:   "2026-05-24T10:00:00Z",
+		PaymentID: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+		Status:    "confirmed",
+		Amount:    100.0,
+		Currency:  "USD",
+		Timestamp: "2026-05-24T10:00:00Z",
 	}
 
 	err := recorder.RecordHistory(context.Background(), event)
@@ -103,11 +103,11 @@ func TestRecordHistory_ContextCancelled(t *testing.T) {
 	cancel()
 
 	event := &models.PaymentEvent{
-		PaymentID:   "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-		Status:      "confirmed",
-		Amount:      100.0,
-		Currency:    "USD",
-		Timestamp:   "2026-05-24T10:00:00Z",
+		PaymentID: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+		Status:    "confirmed",
+		Amount:    100.0,
+		Currency:  "USD",
+		Timestamp: "2026-05-24T10:00:00Z",
 	}
 
 	err := recorder.RecordHistory(ctx, event)

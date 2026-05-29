@@ -99,21 +99,21 @@ func (m *mockSession) MarkMessage(msg *sarama.ConsumerMessage, metadata string) 
 	m.markedMsg = msg
 }
 
-func (m *mockSession) MarkOffset(topic string, partition int32, offset int64, metadata string) {}
+func (m *mockSession) MarkOffset(topic string, partition int32, offset int64, metadata string)  {}
 func (m *mockSession) ResetOffset(topic string, partition int32, offset int64, metadata string) {}
-func (m *mockSession) Claims() map[string][]int32  { return nil }
-func (m *mockSession) MemberID() string            { return "test-member" }
-func (m *mockSession) GenerationID() int32         { return 1 }
-func (m *mockSession) Commit()                     {}
+func (m *mockSession) Claims() map[string][]int32                                               { return nil }
+func (m *mockSession) MemberID() string                                                         { return "test-member" }
+func (m *mockSession) GenerationID() int32                                                      { return 1 }
+func (m *mockSession) Commit()                                                                  {}
 
 type mockClaim struct {
 	messages []*sarama.ConsumerMessage
 }
 
-func (m *mockClaim) Topic() string                            { return "payment.events" }
-func (m *mockClaim) Partition() int32                         { return 0 }
-func (m *mockClaim) InitialOffset() int64                     { return 0 }
-func (m *mockClaim) HighWaterMarkOffset() int64               { return 0 }
+func (m *mockClaim) Topic() string              { return "payment.events" }
+func (m *mockClaim) Partition() int32           { return 0 }
+func (m *mockClaim) InitialOffset() int64       { return 0 }
+func (m *mockClaim) HighWaterMarkOffset() int64 { return 0 }
 func (m *mockClaim) Messages() <-chan *sarama.ConsumerMessage {
 	ch := make(chan *sarama.ConsumerMessage, len(m.messages))
 	for _, msg := range m.messages {
