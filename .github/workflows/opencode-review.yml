@@ -1,62 +1,32 @@
 # OpenCode Review — Revisao automatizada de Pull Requests
-# Segue o padrao da doc: https://opencode.ai/docs/pt-br/github/#exemplo-de-pull-request
-name: OpenCode Review
+# Conforme doc: https://opencode.ai/docs/pt-br/github/#exemplo-de-pull-request
+name: opencode-review
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-  workflow_dispatch:
-    inputs:
-      pr-number:
-        description: 'Numero do PR para revisar'
-        required: true
-
-concurrency:
-  group: ${{ github.workflow }}-${{
-    github.event.pull_request.number ||
-    github.event.inputs.pr-number }}
-  cancel-in-progress: true
 
 jobs:
   review:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    if: |
-      (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop') ||
-      (github.event_name == 'workflow_dispatch')
     permissions:
       id-token: write
       contents: read
       pull-requests: read
+      issues: read
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-
-      - name: Set PR number for workflow_dispatch
-        id: pr-info
-        run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "number=${{ github.event.inputs.pr-number }}" >> "$GITHUB_OUTPUT"
-          fi
-
       - uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           model: opencode/big-pickle
+          use_github_token: true
           prompt: |
-            PR=${{ steps.pr-info.outputs.number }}
-
-            Revise este pull request #$PR (Go 1.26):
-            - Verifique qualidade do codigo Go (idiomatico, erros com fmt.Errorf, context.Context)
-            - Testes acompanham as alteracoes?
-            - Tratamento de erros e timeouts
-            - Logs estruturados nos pontos criticos
-            - Seguranca basica
-
-            Classifique como: BLOQUEADOR, ATENCAO ou SUGESTAO.
-            Se nao houver BLOQUEADORES, aprove o PR.
-            Poste o resumo como comentario no PR.
+            Revise este pull request (Go 1.26):
+            - Verifique qualidade do codigo Go
+            - Procure por potenciais bugs
+            - Sugira melhorias

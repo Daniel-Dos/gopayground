@@ -7,7 +7,6 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  actions: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -148,16 +147,5 @@ jobs:
             echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Trigger OpenCode review
-        if: steps.create-pr.outputs.pr_number != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          PR_NUM="${{ steps.create-pr.outputs.pr_number }}"
-          echo "Disparando OpenCode review para PR #$PR_NUM..."
-          gh workflow run opencode-review.yml \
-            --ref "${{ github.ref_name }}" \
-            -f pr-number="$PR_NUM" \
-            2>&1
-          echo "Workflow dispatch enviado para opencode-review.yml (PR #$PR_NUM)."
+
 
