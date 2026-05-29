@@ -97,53 +97,53 @@ jobs:
           EXISTING=$(gh pr list --head "$BRANCH" --state open --json number --jq 'length' 2>/dev/null || echo "0")
           if [ "$EXISTING" -gt 0 ]; then
             PR_NUM=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
-            echo "PR já existe (#$PR_NUM) — nenhuma ação necessária."
+            echo "PR ja existe (#$PR_NUM) — nenhuma acao necessaria."
             echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
           else
             echo "Nenhum PR aberto encontrado. Criando PR..."
             SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
             BRANCH_NAME="${BRANCH#*/}"
             TITLE="[$PREFIX] $BRANCH_NAME ($SHORT_SHA)"
+
+            git fetch origin develop 2>/dev/null || true
+            CHANGED_FILES=$(git diff --name-only origin/develop...HEAD 2>/dev/null || echo "N/A")
+            COMMIT_LOG=$(git log origin/develop...HEAD --oneline --no-decorate 2>/dev/null || echo "N/A")
+
+            cat > /tmp/pr_body.md << BODYEOF
+## 🤖 PR gerado automaticamente
+
+| Item | Detalhe |
+|------|---------|
+| **Tipo** | $PREFIX |
+| **Branch** | $BRANCH |
+| **Base** | develop |
+| **Commit** | $SHORT_SHA |
+
+### Commits
+$COMMIT_LOG
+
+### Arquivos alterados
+$CHANGED_FILES
+
+### Status do CI
+✅ Lint — golangci-lint passou
+✅ Testes — make test passou
+✅ Build — make build compilou
+
+### Revisao
+Aguardando revisao automatizada do OpenCode (dispara no proximo push).
+
+---
+*Este PR foi gerado automaticamente pelo pipeline CI.*
+BODYEOF
+
             PR_URL=$(gh pr create \
               --base develop \
               --head "$BRANCH" \
               --title "$TITLE" \
-              --body "$(printf '## 🔄 PR gerado automaticamente pelo CI\n\n**Tipo:** %s\n**Branch:** %s\n**Commit:** %s\n\nEste PR foi criado automaticamente apos o pipeline CI ser aprovado.' "$PREFIX" "$BRANCH" "${{ github.sha }}")")
+              --body-file /tmp/pr_body.md)
             PR_NUM=$(echo "$PR_URL" | grep -oP '\d+$')
             echo "PR criado: #$PR_NUM"
             echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
-          fi
-      - name: OpenCode review
-        if: steps.create-pr.outputs.pr_number != ''
-        uses: anomalyco/opencode/github@latest
-        env:
-          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          model: opencode/deepseek-v4-flash-free
-          use_github_token: true
-          prompt: |
-            Voce e um revisor de codigo Go para o projeto gopayground.
-
-            O PR #${{ steps.create-pr.outputs.pr_number }} foi criado. 
-            Obtenha o diff com: gh pr diff ${{ steps.create-pr.outputs.pr_number }}
-
-            Revise APENAS as linhas alteradas. Criterios:
-            - Codigo Go idiomatico, erros com fmt.Errorf, context.Context
-            - Testes acompanham as alteracoes?
-            - Tratamento de erros e timeouts
-            - Logs estruturados
-            - Seguranca basica
-
-            Classifique: BLOQUEADOR, ATENCAO ou SUGESTAO.
-            Poste o resumo como comentario no PR.
-      - name: Approve PR after CI+review
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ steps.create-pr.outputs.pr_number }}
-        run: |
-          if [ -n "$PR_NUMBER" ]; then
-            gh pr review "$PR_NUMBER" --approve --body "✅ CI passou (lint + test + build). PR aprovado automaticamente."
-            echo "PR #$PR_NUMBER aprovado."
           fi
 
