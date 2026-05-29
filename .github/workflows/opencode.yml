@@ -2,7 +2,7 @@ name: opencode
 
 on:
   pull_request:
-    branches: [master]
+    branches: [develop]
     types: [opened, synchronize, reopened]
   issue_comment:
     types: [created]
