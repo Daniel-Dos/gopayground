@@ -1,6 +1,6 @@
 # Workflows GitHub Actions — gopayground
 
-Este documento descreve os quatro workflows de GitHub Actions configurados no
+Este documento descreve os três workflows de GitHub Actions configurados no
 repositório `github.com/Daniel-Dos/gopayground`. Cada workflow atende a um
 propósito específico dentro do pipeline de desenvolvimento: integração contínua,
 execução de comandos OpenCode via comentários, revisão automática de pull
@@ -167,241 +167,48 @@ necessario. O CI so precisa ler o codigo, nunca escrever de volta.
 
 ---
 
-## 2. Workflow OpenCode Integration — `opencode.yml`
+## 2. `opencode.yml` — Assistente OpenCode para PRs
 
-Este workflow permite que qualquer pessoa com acesso ao repositorio invoque o
-OpenCode Agent diretamente de comentarios em issues e pull requests. Basta
-escrever `/oc` ou `/opencode` no inicio ou no meio do comentario para que o
-workflow dispare.
+### Trigger
 
-### 2.1 Trigger
+- `pull_request`: executado ao abrir, sincronizar ou reabrir PRs para `master`
+- `issue_comment`: executado quando um comentário contém `/oc`, `/opencode` ou `/run`
+- `pull_request_review_comment`: executado quando um comentário em code review contém `/oc`, `/opencode` ou `/run`
 
-O workflow escuta dois eventos:
+### Fluxo de Execução
 
+1. **Checkout** do repositório com `fetch-depth: 0` e `persist-credentials: false`
+2. **Get changed files**: usa `tj-actions/changed-files@v46` para detectar arquivos alterados no PR
+3. **Prepare prompt**: monta prompt dinâmico — lista de arquivos alterados para PRs, corpo do comentário para triggers manuais
+4. **Run opencode**: executa o agente OpenCode com modelo `opencode/big-pickle` e prompt otimizado (sem `use_github_token`, o contexto vem do tj-actions)
+
+### Permissões
 ```yaml
-on:
-  issue_comment:
-    types: [created]
-  pull_request_review_comment:
-    types: [created]
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+  issues: write
+  checks: write
 ```
 
-O evento `issue_comment` captura comentarios em issues e comentarios gerais em
-PRs. O evento `pull_request_review_comment` captura comentarios feitos durante
-uma revisao de codigo (review comments). Ambos usam `types: [created]` para
-executar apenas quando o comentario e criado, ignorando edicoes ou delecoes.
-
-### 2.2 Filtro de Conteudo
-
-O job so executa se o corpo do comentario conter `/oc` ou `/opencode`:
-
-```yaml
-if: |
-  contains(github.event.comment.body, '/oc') ||
-  contains(github.event.comment.body, '/opencode')
-```
-
-Isso usa `contains()` do GitHub Expression Language, que e case-sensitive e
-busca a substring em qualquer posicao do texto. Comentarios que nao contenham
-nenhum dos marcadores sao ignorados sem custo de execucao.
-
-### 2.3 Job OpenCode
-
-```yaml
-jobs:
-  opencode:
-    if: |
-      contains(github.event.comment.body, '/oc') ||
-      contains(github.event.comment.body, '/opencode')
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - uses: anomalyco/opencode/github@latest
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        with:
-          model: anthropic/claude-sonnet-4-20250514
-```
-
-A permissao `id-token: write` e o minimo necessario para o OpenCode obter o
-token de instalacao do OpenCode App. O workflow nao declara permissoes de
-escrita em `contents` ou `pull-requests` porque o OpenCode App ja esta
-instalado no repositorio e gerencia suas proprias permissoes de forma
-independente.
-
-O model `anthropic/claude-sonnet-4-20250514` e o Claude Sonnet 4, que oferece
-um equilibrio entre qualidade de resposta e custo. O agente padrao e o
-`planner`, conforme definido no `opencode.json` do projeto.
-
-### 2.4 Como Usar
-
-Em qualquer issue ou pull request, escreva um comentario contendo `/oc` ou
-`/opencode` seguido da instrucao desejada. Por exemplo:
-
-- `/oc analise o arquivo main.go e sugira melhorias`
-- `/opencode crie uma spec para adicionar suporte a PostgreSQL`
-- `/oc explique o fluxo de processamento de pagamentos`
-
-O OpenCode respondera no mesmo thread do comentario. O tempo de resposta
-depende da complexidade da tarefa e da latencia da API Anthropic, mas
-tipicamente leva entre 30 segundos e 2 minutos.
+### Segurança
+- `OPENCODE_API_KEY` armazenada em `secrets.OPENCODE_API_KEY`
+- `persist-credentials: false` no checkout
+- `continue-on-error: true` no step de extração de arquivos (falha suave)
+- `timeout-minutes: 10` para evitar execuções infinitas
+- `concurrency` group com `cancel-in-progress: true`
 
 ---
 
-## 3. Workflow PR Review — `pr-review.yml`
-
-O workflow de revisao automatica de pull requests usa o OpenCode para analisar
-cada PR aberto contra `master` e postar um review com apontamentos
-classificados por gravidade. O objetivo e detectar problemas cedo e reduzir a
-carga de revisao manual.
-
-### 3.1 Trigger
-
-```yaml
-on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-```
-
-Os tres tipos de evento cobrem o ciclo de vida completo de um PR:
-
-- `opened`: quando o PR e criado pela primeira vez.
-- `synchronize`: quando novos commits sao adicionados ao branch do PR.
-- `reopened`: quando um PR fechado e reaberto.
-
-Note que o evento `pull_request` com `types: [opened]` ja cobre o cenario
-inicial; `synchronize` garante que revisoes sejam atualizadas a cada novo
-commit, e `reopened` cobre PRs que foram fechados e reabertos.
-
-### 3.2 Concorrencia
-
-```yaml
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-```
-
-Assim como no CI, execucoes concorrentes para o mesmo PR (por exemplo, varios
-commits rapidos) sao canceladas automaticamente. Apenas a execucao mais recente
-prossegue.
-
-### 3.3 Job Review
-
-```yaml
-jobs:
-  review:
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - uses: anomalyco/opencode/github@latest
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        with:
-          model: anthropic/claude-sonnet-4-20250514
-          use_github_token: true
-          prompt: |
-            Revise este pull request para o projeto gopayground (Go 1.26).
-
-            Criterios de revisao:
-            1. **Qualidade do codigo Go**: idiomatico, interfaces pequenas, composicao.
-               - `context.Context` deve ser passado em operacoes bloqueantes.
-               - Erros devem usar `fmt.Errorf("%w", err)` para wrapping.
-               - Preferir simplicidade sobre abstracao prematura.
-            2. **Testes**: o PR inclui testes table-driven? Usa `-race`? Subtests?
-               Cobertura minima para novas funcionalidades?
-            3. **Sistemas distribuidos**: tratamento de timeout, retry, backoff,
-               idempotencia para operacoes com Kafka/Redis/DynamoDB.
-            4. **Logs estruturados**: pontos criticos com `slog.Logger`.
-            5. **Seguranca**: injecao, validacao de entrada, permissoes minimas.
-            6. **Breaking changes**: mudancas em interfaces publicas (`pkg/` ou
-               `internal/`) que possam afetar outros componentes.
-            7. **Documentacao**: README, ADRs ou comentarios atualizados?
-
-            Para cada problema encontrado, classifique como:
-            - **Blocker**: impede o merge (bug, seguranca, breaking change)
-            - **Warning**: deve ser corrigido, mas nao bloqueia
-            - **Suggestion**: melhoria opcional
-
-            Inclua o trecho de codigo relevante em cada apontamento.
-```
-
-### 3.4 O Parametro `use_github_token`
-
-O parametro `use_github_token: true` instrui o OpenCode a usar o
-`GITHUB_TOKEN` padrao do GitHub Actions para postar o review como um
-comentario no PR. Sem essa flag, o OpenCode nao teria permissao para escrever
-no pull request, e o review ficaria invisivel dentro do workflow log.
-
-O `GITHUB_TOKEN` e injetado automaticamente pelo GitHub Actions; nao e
-necessario configura-lo manualmente. O token tem escopo limitado ao
-repositorio onde o workflow executa e e valido apenas durante a execucao do
-workflow.
-
-### 3.5 Criterios de Revisao
-
-O prompt personalizado define sete criterios de avaliacao, cada um mapeado
-diretamente para as convencoes tecnicas do projeto:
-
-1. **Qualidade do codigo Go**: reflete as convencoes estabelecidas no
-   `AGENTS.md` — interfaces pequenas, composicao, `context.Context` em
-   operacoes bloqueantes, erros com `fmt.Errorf("%w", err)`.
-
-2. **Testes**: verifica se o PR segue o padrao de testes table-driven com
-   subtests, pratica definida como obrigatoria para o projeto.
-
-3. **Sistemas distribuidos**: critico para um sistema que usa Kafka, Redis e
-   DynamoDB. O revisor busca tratamento de timeout, retry com backoff e
-   idempotencia.
-
-4. **Logs estruturados**: o projeto usa `slog.Logger` para logs estruturados
-   nos pontos criticos. O revisor verifica se novos codigos seguem essa
-   convencao.
-
-5. **Seguranca**: validacao de entrada, protecao contra injecao e principio
-   do menor privilegio.
-
-6. **Breaking changes**: mudancas em interfaces publicas de `pkg/` ou
-   `internal/` que possam afetar outros componentes do sistema.
-
-7. **Documentacao**: verifica se o PR atualiza README, ADRs ou comentarios
-   quando necessario.
-
-### 3.6 Classificacao dos Apontamentos
-
-Cada problema encontrado e classificado em uma de tres categorias:
-
-- **Blocker**: problemas que impedem o merge. Incluem bugs de seguranca,
-  vulnerabilidades, breaking changes sem discussao previa e violacoes graves
-  das convencoes do projeto.
-- **Warning**: problemas que devem ser corrigidos antes do merge, mas nao
-  sao impeditivos absolutos. Exemplos: log ausente em ponto critico, falta de
-  tratamento de erro em operacao de IO, teste sem subtest.
-- **Suggestion**: melhorias opcionais que nao impactam a correcao ou
-  seguranca. Exemplos: renomear variavel para maior clareza, extrair funcao
-  muito longa, adicionar comentario de documentacao.
-
-Cada apontamento inclui o trecho de codigo relevante, o que permite ao autor
-do PR identificar exatamente o local da ocorrencia sem precisar ler o diff
-inteiro.
-
----
-
-## 4. Workflow Issue Triage — `opencode-triage.yml`
+## 3. Workflow Issue Triage — `opencode-triage.yml`
 
 O workflow de triagem de issues automatiza a resposta inicial a novas issues
 abertas no repositorio. Ele usa um filtro anti-spam baseado na idade da conta
 do GitHub e, para issues legitimas, invoca o OpenCode para analisar o conteudo
 e fornecer uma resposta orientativa.
 
-### 4.1 Trigger
+### 3.1 Trigger
 
 ```yaml
 on:
@@ -412,7 +219,7 @@ on:
 Executa apenas quando uma nova issue e criada. Issues reabertas ou editadas nao
 disparam o workflow.
 
-### 4.2 Filtro Anti-Spam: Job `check-account-age`
+### 3.2 Filtro Anti-Spam: Job `check-account-age`
 
 O primeiro job consulta a API do GitHub para obter a data de criacao da conta
 do usuario que abriu a issue. Se a conta tiver menos de 30 dias, a issue e
@@ -458,7 +265,7 @@ duvidosa do que silenciosamente ignora-la.
 O job `check-account-age` usa permissoes minimas (`contents: read` e
 `issues: read`) porque so precisa consultar dados publicos e definir um output.
 
-### 4.3 Job `triage`
+### 3.3 Job `triage`
 
 O segundo job so executa se o output de `check-account-age` for `'true'`:
 
@@ -476,9 +283,9 @@ triage:
         persist-credentials: false
     - uses: anomalyco/opencode/github@latest
       env:
-        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       with:
-        model: anthropic/claude-sonnet-4-20250514
+        model: opencode/big-pickle
         prompt: |
           Revise esta issue para o projeto gopayground.
           - Se houver documentacao relevante, mencione links.
@@ -502,31 +309,31 @@ O comportamento esperado:
 
 ---
 
-## 5. Configuracao Inicial
+## 4. Configuracao Inicial
 
 Para que os workflows funcionem corretamente, tres configuracoes sao
 necessarias no repositorio GitHub.
 
-### 5.1 Secrets
+### 4.1 Secrets
 
 Apenas um secret precisa ser criado manualmente:
 
 | Secret | Workflows que usam | Descricao |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | opencode.yml, pr-review.yml, opencode-triage.yml | Chave de API para o modelo Claude Sonnet 4 da Anthropic |
+| `OPENCODE_API_KEY` | opencode.yml, opencode-triage.yml | Chave de API para o modelo opencode/big-pickle |
 
 O `GITHUB_TOKEN` e automaticamente fornecido pelo GitHub Actions em cada
 execucao de workflow e nao requer configuracao manual.
 
-Para adicionar o `ANTHROPIC_API_KEY`:
+Para adicionar o `OPENCODE_API_KEY`:
 
 1. Acesse `https://github.com/Daniel-Dos/gopayground/settings/secrets/actions`
 2. Clique em "New repository secret"
-3. Nome: `ANTHROPIC_API_KEY`
-4. Valor: a chave de API obtida no console da Anthropic
+3. Nome: `OPENCODE_API_KEY`
+4. Valor: a chave de API fornecida pelo OpenCode
 5. Clique em "Add secret"
 
-### 5.2 Permissoes do GITHUB_TOKEN
+### 4.2 Permissoes do GITHUB_TOKEN
 
 O `GITHUB_TOKEN` padrao do GitHub Actions precisa de permissao para criar e
 aprovar pull requests, pois o OpenCode pode precisar criar branches e PRs
@@ -537,7 +344,7 @@ durante a execucao.
    approve pull requests"
 3. Salve as alteracoes
 
-### 5.3 OpenCode App
+### 4.3 OpenCode App
 
 O OpenCode App deve estar instalado no repositorio. Para verificar:
 
@@ -549,20 +356,19 @@ O arquivo `opencode.json` na raiz do projeto ja define `default_agent:
 "planner"`, que e o agente utilizado por todos os workflows que invocam o
 OpenCode.
 
-### 5.4 Sumario de Permissoes por Workflow
+### 4.4 Sumario de Permissoes por Workflow
 
 | Workflow | Permissoes | Justificativa |
 |---|---|---|
 | `ci.yml` | `contents: read` | So precisa ler o codigo e publicar status checks |
 | `opencode.yml` | `id-token: write` | OpenCode precisa do token de instalacao do App |
-| `pr-review.yml` | `id-token: write` | OpenCode precisa postar review no PR (usa `GITHUB_TOKEN`) |
 | `opencode-triage.yml` | `id-token: write`, `issues: write` | OpenCode precisa comentar na issue |
 
 ---
 
-## 6. Manutencao
+## 5. Manutencao
 
-### 6.1 Versionamento de Actions
+### 5.1 Versionamento de Actions
 
 Todas as actions de terceiros utilizam major version pin (`@v6`, `@v5`, `@v7`),
 o que oferece um equilibrio entre estabilidade e recebimento de atualizacoes
@@ -581,7 +387,7 @@ oficial recomenda essa abordagem e a action ainda esta em evolucao ativa.
 Quando a action atingir uma versao estavel (`@v1` ou similar), recomenda-se
 migrar para major version pin ou SHA fixo para maior reprodutibilidade.
 
-### 6.2 Como Testar Localmente com `act`
+### 5.2 Como Testar Localmente com `act`
 
 A ferramenta `act` (https://github.com/nektos/act) permite executar workflows
 do GitHub Actions localmente, o que agiliza o desenvolvimento e调试 de novos
@@ -591,12 +397,6 @@ Para testar o workflow de CI localmente:
 
 ```bash
 act -W .github/workflows/ci.yml --pull=false
-```
-
-Para testar o workflow de PR review:
-
-```bash
-act pull_request -W .github/workflows/pr-review.yml
 ```
 
 Para testar o workflow de issue triage:
@@ -613,9 +413,9 @@ Notas sobre o uso do `act`:
 - O `act` nao suporta todos os eventos e recursos do GitHub Actions. Eventos
   como `issue_comment` podem ter suporte limitado dependendo da versao.
 - Para testar workflows que usam `anomalyco/opencode/github`, e necessario ter
-  a chave `ANTHROPIC_API_KEY` disponivel localmente.
+  a chave `OPENCODE_API_KEY` disponivel localmente.
 
-### 6.3 Boas Praticas
+### 5.3 Boas Praticas
 
 - Toda alteracao em arquivos de workflow deve passar por revisao em pull
   request, assim como qualquer outra alteracao no codigo.
