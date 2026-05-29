@@ -106,35 +106,46 @@ jobs:
             TITLE="[$PREFIX] $BRANCH_NAME ($SHORT_SHA)"
 
             git fetch origin develop 2>/dev/null || true
-            CHANGED_FILES=$(git diff --name-only origin/develop...HEAD 2>/dev/null || echo "N/A")
-            COMMIT_LOG=$(git log origin/develop...HEAD --oneline --no-decorate 2>/dev/null || echo "N/A")
+
+            FILES_STATS=$(git diff --stat origin/develop...HEAD 2>/dev/null || echo "")
+            if [ -z "$FILES_STATS" ]; then
+              FILES_STATS="Nenhum arquivo alterado (ja sincronizado com develop)"
+            fi
+
+            COMMITS=$(git log origin/develop..HEAD --oneline --no-decorate 2>/dev/null || echo "")
+            if [ -z "$COMMITS" ]; then
+              COMMITS="Nenhum commit novo"
+            fi
+
+            SUMMARY=$(git log origin/develop..HEAD --format="- %s" 2>/dev/null || echo "")
+            if [ -z "$SUMMARY" ]; then
+              SUMMARY="- Nenhuma alteracao nova"
+            fi
 
             {
-              echo "## 🤖 PR gerado automaticamente"
+              echo "## Resumo das alteracoes"
               echo ""
-              echo "| Item | Detalhe |"
-              echo "|------|---------|"
-              echo "| **Tipo** | $PREFIX |"
-              echo "| **Branch** | $BRANCH |"
-              echo "| **Base** | develop |"
-              echo "| **Commit** | $SHORT_SHA |"
+              echo "$SUMMARY"
               echo ""
-              echo "### Commits"
-              echo "$COMMIT_LOG"
+              echo "## Commits"
+              echo '```'
+              echo "$COMMITS"
+              echo '```'
               echo ""
-              echo "### Arquivos alterados"
-              echo "$CHANGED_FILES"
+              echo "## Arquivos alterados"
+              echo '```'
+              echo "$FILES_STATS"
+              echo '```'
               echo ""
-              echo "### Status do CI"
-              echo ":white_check_mark: Lint - golangci-lint passou"
-              echo ":white_check_mark: Testes - make test passou"
-              echo ":white_check_mark: Build - make build compilou"
+              echo "## CI"
               echo ""
-              echo "### Revisao"
-              echo "Aguardando revisao automatizada do OpenCode (dispara no proximo push)."
+              echo "- [x] Lint (golangci-lint)"
+              echo "- [x] Testes (make test)"
+              echo "- [x] Build (make build)"
               echo ""
               echo "---"
-              echo "*Este PR foi gerado automaticamente pelo pipeline CI.*"
+              echo ""
+              echo "> Para revisao automatizada, comente \`/oc review\` neste PR."
             } > /tmp/pr_body.md
 
             PR_URL=$(gh pr create \
@@ -146,4 +157,6 @@ jobs:
             echo "PR criado: #$PR_NUM"
             echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
           fi
+
+
 
