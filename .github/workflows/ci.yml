@@ -64,7 +64,7 @@ jobs:
 
   auto-pr:
     needs: build
-    if: github.ref_name != 'master' && github.ref_name != 'develop'
+    if: github.ref_name != 'master' && github.ref_name != 'develop' && !contains(github.ref_name, '/merge')
     runs-on: ubuntu-latest
     timeout-minutes: 2
     continue-on-error: true
