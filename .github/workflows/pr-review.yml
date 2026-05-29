@@ -11,6 +11,7 @@ concurrency:
 
 jobs:
   review:
+    if: false  # Desabilitado — review agora é feito manualmente via comentário no PR
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

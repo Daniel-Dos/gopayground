@@ -1,10 +1,8 @@
 # CI — Pipeline de integração contínua
-# Executa lint, testes e build em pushes e PRs para master
+# Executa lint, testes e build em qualquer push (não master/develop)
 name: CI
 on:
   push:
-  pull_request:
-    branches: [master, develop]
 
 permissions:
   contents: read
@@ -88,6 +86,7 @@ jobs:
             echo "prefix=change" >> "$GITHUB_OUTPUT"
           fi
       - name: Create PR if not exists
+        id: create-pr
         env:
           GH_TOKEN: ${{ github.token }}
           PREFIX: ${{ steps.prefix.outputs.prefix }}
@@ -97,15 +96,38 @@ jobs:
           echo "Prefix: $PREFIX"
           EXISTING=$(gh pr list --head "$BRANCH" --state open --json number --jq 'length' 2>/dev/null || echo "0")
           if [ "$EXISTING" -gt 0 ]; then
-            echo "PR já existe para branch '$BRANCH' — nenhuma ação necessária."
+            PR_NUM=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
+            echo "PR já existe (#$PR_NUM) — nenhuma ação necessária."
+            echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
           else
             echo "Nenhum PR aberto encontrado. Criando PR..."
             SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
             BRANCH_NAME="${BRANCH#*/}"
             TITLE="[$PREFIX] $BRANCH_NAME ($SHORT_SHA)"
-            gh pr create \
+            PR_URL=$(gh pr create \
               --base develop \
               --head "$BRANCH" \
               --title "$TITLE" \
-              --body "$(printf '## 🤖 PR gerado automaticamente pelo CI\n\n**Tipo:** %s\n**Branch:** %s\n**Commit:** %s\n\nEste PR foi criado automaticamente apos o pipeline CI ser aprovado.\n\n> ⚠️ Revise as alteracoes antes de fazer o merge.' "$PREFIX" "$BRANCH" "${{ github.sha }}")"
+              --body "$(printf '## 🤖 PR gerado automaticamente pelo CI\n\n**Tipo:** %s\n**Branch:** %s\n**Commit:** %s\n\nEste PR foi criado automaticamente apos o pipeline CI ser aprovado.\n\n> ⚠️ Revise as alteracoes antes de fazer o merge.' "$PREFIX" "$BRANCH" "${{ github.sha }}")")
+            PR_NUM=$(echo "$PR_URL" | grep -oP '\d+$')
+            echo "PR criado: #$PR_NUM"
+            echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Post review request comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.create-pr.outputs.pr_number }}
+        run: |
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr comment "$PR_NUMBER" \
+              --body "## 🧑‍💻 Revisão necessária
+
+Este PR foi criado automaticamente pelo CI após todos os checks passarem (lint + test + build).
+
+### Antes de fazer o merge:
+- [ ] Revise as alteracoes neste PR
+- [ ] Verifique se atende aos criterios de qualidade
+- [ ] Aprove ou solicite alteracoes
+
+> ⚠️ O merge depende de aprovacao manual."
           fi
