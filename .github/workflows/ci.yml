@@ -119,15 +119,17 @@ jobs:
           PR_NUMBER: ${{ steps.create-pr.outputs.pr_number }}
         run: |
           if [ -n "$PR_NUMBER" ]; then
-            gh pr comment "$PR_NUMBER" \
-              --body "## 🧑‍💻 Revisão necessária
+            cat > /tmp/review-comment.md <<- 'EOF'
+            ## Revisão necessária
 
-Este PR foi criado automaticamente pelo CI após todos os checks passarem (lint + test + build).
+            Este PR foi criado automaticamente pelo CI apos todos os checks passarem (lint + test + build).
 
-### Antes de fazer o merge:
-- [ ] Revise as alteracoes neste PR
-- [ ] Verifique se atende aos criterios de qualidade
-- [ ] Aprove ou solicite alteracoes
+            ### Antes de fazer o merge
+            - Revise as alteracoes neste PR
+            - Verifique se atende aos criterios de qualidade
+            - Aprove ou solicite alteracoes
 
-> ⚠️ O merge depende de aprovacao manual."
+            > O merge depende de aprovacao manual.
+            EOF
+            gh pr comment "$PR_NUMBER" --body "$(cat /tmp/review-comment.md)"
           fi
