@@ -1,0 +1,50 @@
+# PR Review — Revisão automática de Pull Requests com OpenCode
+# Executa ao abrir, sincronizar ou reabrir um PR
+name: opencode-review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: anomalyco/opencode/github@latest
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        with:
+          model: opencode/big-pickle
+          use_github_token: true
+          prompt: |
+            Revise este pull request para o projeto gopayground (Go 1.26).
+
+            Critérios de revisão:
+            1. **Qualidade do código Go**: idiomático, interfaces pequenas, composição.
+               - `context.Context` deve ser passado em operações bloqueantes.
+               - Erros devem usar `fmt.Errorf("%w", err)` para wrapping.
+               - Preferir simplicidade sobre abstração prematura.
+            2. **Testes**: o PR inclui testes table-driven? Usa `-race`? Subtests?
+               Cobertura mínima para novas funcionalidades?
+            3. **Sistemas distribuídos**: tratamento de timeout, retry, backoff,
+               idempotência para operações com Kafka/Redis/DynamoDB.
+            4. **Logs estruturados**: pontos críticos com `slog.Logger`.
+            5. **Segurança**: injeção, validação de entrada, permissões mínimas.
+            6. **Breaking changes**: mudanças em interfaces públicas (`pkg/` ou
+               `internal/`) que possam afetar outros componentes.
+            7. **Documentação**: README, ADRs ou comentários atualizados?
+
+            Para cada problema encontrado, classifique como:
+            - ❌ **Blocker**: impede o merge (bug, segurança, breaking change)
+            - ⚠️ **Warning**: deve ser corrigido, mas não bloqueia
+            - 💡 **Suggestion**: melhoria opcional
+
+            Inclua o trecho de código relevante em cada apontamento.
