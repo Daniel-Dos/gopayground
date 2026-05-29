@@ -1,10 +1,8 @@
 # CI — Pipeline de integração contínua
-# Executa lint, testes e build em pushes e PRs para master
+# Executa lint, testes e build em qualquer push (não master/develop)
 name: CI
 on:
   push:
-  pull_request:
-    branches: [master, develop]
 
 permissions:
   contents: read
@@ -66,7 +64,7 @@ jobs:
     needs: build
     if: github.ref_name != 'master' && github.ref_name != 'develop' && !contains(github.ref_name, '/merge')
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 15
     continue-on-error: true
     steps:
       - name: Checkout
@@ -88,6 +86,7 @@ jobs:
             echo "prefix=change" >> "$GITHUB_OUTPUT"
           fi
       - name: Create PR if not exists
+        id: create-pr
         env:
           GH_TOKEN: ${{ github.token }}
           PREFIX: ${{ steps.prefix.outputs.prefix }}
@@ -97,15 +96,54 @@ jobs:
           echo "Prefix: $PREFIX"
           EXISTING=$(gh pr list --head "$BRANCH" --state open --json number --jq 'length' 2>/dev/null || echo "0")
           if [ "$EXISTING" -gt 0 ]; then
-            echo "PR já existe para branch '$BRANCH' — nenhuma ação necessária."
+            PR_NUM=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
+            echo "PR ja existe (#$PR_NUM) — nenhuma acao necessaria."
+            echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
           else
             echo "Nenhum PR aberto encontrado. Criando PR..."
             SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
             BRANCH_NAME="${BRANCH#*/}"
             TITLE="[$PREFIX] $BRANCH_NAME ($SHORT_SHA)"
-            gh pr create \
+
+            git fetch origin develop 2>/dev/null || true
+            CHANGED_FILES=$(git diff --name-only origin/develop...HEAD 2>/dev/null || echo "N/A")
+            COMMIT_LOG=$(git log origin/develop...HEAD --oneline --no-decorate 2>/dev/null || echo "N/A")
+
+            {
+              echo "## 🤖 PR gerado automaticamente"
+              echo ""
+              echo "| Item | Detalhe |"
+              echo "|------|---------|"
+              echo "| **Tipo** | $PREFIX |"
+              echo "| **Branch** | $BRANCH |"
+              echo "| **Base** | develop |"
+              echo "| **Commit** | $SHORT_SHA |"
+              echo ""
+              echo "### Commits"
+              echo "$COMMIT_LOG"
+              echo ""
+              echo "### Arquivos alterados"
+              echo "$CHANGED_FILES"
+              echo ""
+              echo "### Status do CI"
+              echo ":white_check_mark: Lint - golangci-lint passou"
+              echo ":white_check_mark: Testes - make test passou"
+              echo ":white_check_mark: Build - make build compilou"
+              echo ""
+              echo "### Revisao"
+              echo "Aguardando revisao automatizada do OpenCode (dispara no proximo push)."
+              echo ""
+              echo "---"
+              echo "*Este PR foi gerado automaticamente pelo pipeline CI.*"
+            } > /tmp/pr_body.md
+
+            PR_URL=$(gh pr create \
               --base develop \
               --head "$BRANCH" \
               --title "$TITLE" \
-              --body "$(printf '## 🤖 PR gerado automaticamente pelo CI\n\n**Tipo:** %s\n**Branch:** %s\n**Commit:** %s\n\nEste PR foi criado automaticamente apos o pipeline CI ser aprovado.\n\n> ⚠️ Revise as alteracoes antes de fazer o merge.' "$PREFIX" "$BRANCH" "${{ github.sha }}")"
+              --body-file /tmp/pr_body.md)
+            PR_NUM=$(echo "$PR_URL" | grep -oP '\d+$')
+            echo "PR criado: #$PR_NUM"
+            echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
           fi
+
