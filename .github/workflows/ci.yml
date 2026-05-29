@@ -1,8 +1,10 @@
 # CI — Pipeline de integração contínua
-# Executa lint, testes e build em qualquer push (não master/develop)
+# Executa lint, testes e build em qualquer push (exceto master)
 name: CI
 on:
   push:
+    branches-ignore:
+      - master
 
 permissions:
   contents: read
@@ -122,31 +124,40 @@ jobs:
               SUMMARY="- Nenhuma alteracao nova"
             fi
 
-            {
-              echo "## Resumo das alteracoes"
-              echo ""
-              echo "$SUMMARY"
-              echo ""
-              echo "## Commits"
-              echo '```'
-              echo "$COMMITS"
-              echo '```'
-              echo ""
-              echo "## Arquivos alterados"
-              echo '```'
-              echo "$FILES_STATS"
-              echo '```'
-              echo ""
-              echo "## CI"
-              echo ""
-              echo "- [x] Lint (golangci-lint)"
-              echo "- [x] Testes (make test)"
-              echo "- [x] Build (make build)"
-              echo ""
-              echo "---"
-              echo ""
-              echo "> Para revisao automatizada, comente \`/oc review\` neste PR."
-            } > /tmp/pr_body.md
+            # --- Constroi o body do PR usando o template oficial ---
+            TEMPLATE=$(cat .github/PULL_REQUEST_TEMPLATE.md)
+
+            # Preenche a descricao com o summary dos commits
+            DESCRICAO="$SUMMARY"
+            BODY="${TEMPLATE/<!-- Descreva o que este PR altera e por que -->/$DESCRICAO}"
+
+            # Marca o tipo de mudanca conforme o prefixo da branch
+            case "$PREFIX" in
+              feature) BODY="${BODY/- [ ] ✨ Feature/- [x] ✨ Feature}" ;;
+              fix|bugfix|hotfix) BODY="${BODY/- [ ] 🐛 Bugfix/- [x] 🐛 Bugfix}" ;;
+              release) BODY="${BODY/- [ ] ✨ Feature/- [x] ✨ Feature}" ;;
+              refactor) BODY="${BODY/- [ ] 🔧 Refactor/- [x] 🔧 Refactor}" ;;
+              docs|doc) BODY="${BODY/- [ ] 📚 Documentação/- [x] 📚 Documentação}" ;;
+              perf) BODY="${BODY/- [ ] ⚡ Performance/- [x] ⚡ Performance}" ;;
+              test|tests) BODY="${BODY/- [ ] 🧪 Testes/- [x] 🧪 Testes}" ;;
+              security|sec) BODY="${BODY/- [ ] 🔒 Segurança/- [x] 🔒 Segurança}" ;;
+              chore|ci) BODY="${BODY/- [ ] 🤖 CI\/CD/- [x] 🤖 CI/CD}" ;;
+            esac
+
+            # Preenche "Como testar" com passos basicos
+            FILES_LIST=$(git diff --name-only origin/develop...HEAD 2>/dev/null | head -5 | paste -sd, -)
+            BODY="${BODY/1./1. CI passar (lint, test, build) - verificar status abaixo}"
+            BODY="${BODY/2./2. Revisar alteracoes em: $FILES_LIST}"
+            BODY="${BODY/3./3. Executar \`make test\` e \`make build\` localmente}"
+
+            # Preenche "Observacoes" com o resumo dos commits e CI
+            OBS="**Commits:**\n\`\`\`\n$COMMITS\n\`\`\`\n\n"
+            OBS="${OBS}**Arquivos alterados:**\n\`\`\`\n$FILES_STATS\n\`\`\`\n\n"
+            OBS="${OBS}**CI:** ✅ Lint (golangci-lint) | ✅ Testes (make test) | ✅ Build (make build)\n\n"
+            OBS="${OBS}---\n\n> Para revisao automatizada, comente \`/oc review\` neste PR."
+            BODY="${BODY/<!-- Informações adicionais que o revisor precisa saber -->/$OBS}"
+
+            echo "$BODY" > /tmp/pr_body.md
 
             PR_URL=$(gh pr create \
               --base develop \
