@@ -25,7 +25,7 @@ jobs:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: opencode/big-pickle
+          model: opencode/deepseek-v4-flash-free
           use_github_token: true
           prompt: |
             Revise este pull request para o projeto gopayground (Go 1.26).

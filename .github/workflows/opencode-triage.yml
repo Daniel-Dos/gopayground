@@ -46,7 +46,7 @@ jobs:
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         with:
-          model: opencode/big-pickle
+          model: opencode/deepseek-v4-flash-free
           prompt: |
             Revise esta issue para o projeto gopayground.
             - Se houver documentação relevante, mencione links.
