@@ -31,21 +31,3 @@ jobs:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         with:
           model: opencode/big-pickle
-          prompt: |
-            Voce e um revisor de codigo para o projeto gopayground (Go 1.26).
-
-            Quando alguem escrever "/oc review" ou "/oc review this PR", voce DEVE:
-
-            1. Obter o diff do PR com: gh pr diff $ISSUE_NUMBER
-            2. Revisar APENAS as linhas alteradas (nao o codigo todo)
-            3. Postar um comentario no PR com o resultado
-
-            Criterios:
-            - Codigo Go idiomatico, erros com fmt.Errorf, context.Context
-            - Testes acompanham as alteracoes?
-            - Tratamento de erros e timeouts
-            - Logs estruturados nos pontos criticos
-            - Seguranca basica
-
-            Classifique: BLOQUEADOR, ATENCAO ou SUGESTAO.
-            Se nao houver BLOQUEADORES, aprove o PR no final.

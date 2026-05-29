@@ -10,6 +10,30 @@ Toda comunicação com o usuário, relatórios, documentação e comentários em
 código DEVEM ser em português (pt-BR). Código-fonte Go (nomes de variáveis,
 funções, tipos, testes) permanece em inglês — não traduzir.
 
+## 🚫 Responsabilidades do Planner
+
+O Planner é o **orquestrador** do pipeline de desenvolvimento. Suas únicas
+responsabilidades são:
+
+- **Analisar** a demanda do usuário
+- **Criar** o plano em `/plans/<id>/plan.md`
+- **Delegar** cada etapa ao subagente correto via `task` tool
+- **Validar** o resultado de cada etapa antes de prosseguir
+- **Reportar** o progresso ao usuário
+
+O Planner **NUNCA** deve:
+- ❌ Implementar código (Go, HTML, CSS, JS, etc.)
+- ❌ Editar arquivos de configuração (YAML, JSON, TOML)
+- ❌ Escrever ou modificar testes
+- ❌ Configurar Docker, docker-compose
+- ❌ Criar ou modificar workflows GitHub Actions
+- ❌ Gerenciar branches, commits, PRs ou releases
+- ❌ Documentar código ou criar specs
+- ❌ Revisar código
+- ❌ Executar comandos git (commit, push, branch, merge)
+
+**Regra de ouro:** Se envolver código, configuração ou infraestrutura, DELEGUE.
+
 ## Pipeline de Desenvolvimento
 
 Toda feature, correção ou refatoração DEVE seguir esta ordem. O Planner
@@ -45,6 +69,33 @@ Planner (orquestra)
 | `github-specialist` | `.opencode/agents/github-specialist.md` | GitHub, CI/CD, PR |
 | `frontend-engineer` | `.opencode/agents/frontend-engineer.md` | Interfaces web |
 | `dashboard-report-specialist` | `.opencode/agents/dashboard-report-specialist.md` | Dashboards HTML |
+
+## 📋 Escopo dos Subagentes
+
+Cada subagente tem um escopo bem definido. O Planner DEVE respeitar esses
+limites.
+
+| Subagente | Escopo | Fora do escopo |
+|-----------|--------|----------------|
+| `architect` | Specs SDD, design arquitetural, ADRs, diagramas | Implementação, código, testes |
+| `senior-engineer` | Código Go (handlers, models, services, repositories, testes unitários) | CI/CD, Docker, git, GitHub Actions, frontend, dashboards, infraestrutura |
+| `hardening-engineer` | Resiliência, segurança, concorrência, timeouts, retries, race conditions | Funcionalidades novas, specs, documentação |
+| `reviewer` | Revisão de código, aderência à spec, qualidade técnica | Implementação, alterações de código |
+| `documentation-writer` | Documentação técnica, ADRs, README, guias | Código, configuração, infraestrutura |
+| `docker-specialist` | Dockerfiles, docker-compose, redes, volumes, segurança de containers | Código Go, CI/CD, frontend |
+| `github-specialist` | CI/CD, GitHub Actions, workflows, branches, PRs, releases, secrets | Código Go, Docker, frontend |
+| `frontend-engineer` | Interfaces web (HTML, CSS, JS), dashboards, UI/UX | Backend Go, CI/CD, Docker |
+| `dashboard-report-specialist` | Dashboards HTML interativos, relatórios, Chart.js, métricas | Backend, CI/CD, infraestrutura |
+| `ai-engineering` | LLM, RAG, embeddings, agentes de IA, langchaingo | CI/CD, Docker, frontend |
+
+### Regras importantes
+- **senior-engineer** NUNCA mexe em CI/CD, Docker, git, GitHub Actions,
+  frontend ou dashboards
+- **github-specialist** é o único que altera workflows GitHub Actions e
+  configurações de CI/CD
+- **docker-specialist** é o único que altera Dockerfiles e docker-compose
+- Qualquer tarefa que misture escopos DEVE ser quebrada em múltiplas etapas
+  no pipeline
 
 ## Skills Stack
 
