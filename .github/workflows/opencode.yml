@@ -1,23 +1,14 @@
-# OpenCode — Revisao de PRs e comandos manuais
-# Segue o padrao: https://github.com/Daniel-Dos/rust-ai/blob/master/.github/workflows/opencode.yml
 name: opencode
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
   issue_comment:
     types: [created]
   pull_request_review_comment:
     types: [created]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
-  cancel-in-progress: true
-
 jobs:
   opencode:
     if: |
-      github.event_name == 'pull_request' ||
       contains(github.event.comment.body, ' /oc') ||
       startsWith(github.event.comment.body, '/oc') ||
       contains(github.event.comment.body, ' /opencode') ||
@@ -26,17 +17,35 @@ jobs:
     permissions:
       id-token: write
       contents: read
-      pull-requests: write
-      issues: write
+      pull-requests: read
+      issues: read
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout repository
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
 
-      - uses: anomalyco/opencode/github@latest
+      - name: Revisão de código
+        uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         with:
           model: opencode/big-pickle
           prompt: |
-            ${{ github.event_name == 'pull_request' && 'Revise este pull request (Go 1.26): verifique qualidade, bugs e sugira melhorias. Se nao houver bloqueadores, aprove o PR.' || github.event.comment.body }}
+            Voce e um revisor de codigo para o projeto gopayground (Go 1.26).
+
+            Quando alguem escrever "/oc review" ou "/oc review this PR", voce DEVE:
+
+            1. Obter o diff do PR com: gh pr diff $ISSUE_NUMBER
+            2. Revisar APENAS as linhas alteradas (nao o codigo todo)
+            3. Postar um comentario no PR com o resultado
+
+            Criterios:
+            - Codigo Go idiomatico, erros com fmt.Errorf, context.Context
+            - Testes acompanham as alteracoes?
+            - Tratamento de erros e timeouts
+            - Logs estruturados nos pontos criticos
+            - Seguranca basica
+
+            Classifique: BLOQUEADOR, ATENCAO ou SUGESTAO.
+            Se nao houver BLOQUEADORES, aprove o PR no final.
