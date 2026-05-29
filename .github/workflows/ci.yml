@@ -64,7 +64,7 @@ jobs:
     needs: build
     if: github.ref_name != 'master' && github.ref_name != 'develop' && !contains(github.ref_name, '/merge')
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     continue-on-error: true
     steps:
       - name: Checkout
@@ -108,11 +108,42 @@ jobs:
               --base develop \
               --head "$BRANCH" \
               --title "$TITLE" \
-              --body "$(printf '## 🤖 PR gerado automaticamente pelo CI\n\n**Tipo:** %s\n**Branch:** %s\n**Commit:** %s\n\nEste PR foi criado automaticamente apos o pipeline CI ser aprovado.\n\n> ⚠️ Revise as alteracoes antes de fazer o merge.' "$PREFIX" "$BRANCH" "${{ github.sha }}")")
+              --body "$(printf '## 🔄 PR gerado automaticamente pelo CI\n\n**Tipo:** %s\n**Branch:** %s\n**Commit:** %s\n\nEste PR foi criado automaticamente apos o pipeline CI ser aprovado.' "$PREFIX" "$BRANCH" "${{ github.sha }}")")
             PR_NUM=$(echo "$PR_URL" | grep -oP '\d+$')
             echo "PR criado: #$PR_NUM"
             echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
-            gh pr comment "$PR_NUM" --body "/oc review"
-            echo "Comentario /oc review postado no PR #$PR_NUM"
+          fi
+      - name: OpenCode review
+        if: steps.create-pr.outputs.pr_number != ''
+        uses: anomalyco/opencode/github@latest
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          model: opencode/deepseek-v4-flash-free
+          use_github_token: true
+          prompt: |
+            Voce e um revisor de codigo Go para o projeto gopayground.
+
+            O PR #${{ steps.create-pr.outputs.pr_number }} foi criado. 
+            Obtenha o diff com: gh pr diff ${{ steps.create-pr.outputs.pr_number }}
+
+            Revise APENAS as linhas alteradas. Criterios:
+            - Codigo Go idiomatico, erros com fmt.Errorf, context.Context
+            - Testes acompanham as alteracoes?
+            - Tratamento de erros e timeouts
+            - Logs estruturados
+            - Seguranca basica
+
+            Classifique: BLOQUEADOR, ATENCAO ou SUGESTAO.
+            Poste o resumo como comentario no PR.
+      - name: Approve PR after CI+review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.create-pr.outputs.pr_number }}
+        run: |
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr review "$PR_NUMBER" --approve --body "✅ CI passou (lint + test + build). PR aprovado automaticamente."
+            echo "PR #$PR_NUMBER aprovado."
           fi
 
