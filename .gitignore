@@ -28,3 +28,6 @@ node_modules/
 
 # --- Copied docs for UI embed (build artifact) ---
 internal/ui/static/docs/
+
+# --- Planning artifacts (Planner agent) ---
+plans/
