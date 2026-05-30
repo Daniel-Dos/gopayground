@@ -5,8 +5,6 @@ on:
     types: [created]
   pull_request_review_comment:
     types: [created]
-  pull_request_review:
-    types: [submitted]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,8 +13,6 @@ concurrency:
 jobs:
   opencode:
     if: |
-      github.event_name == 'pull_request_review' ||
-      github.event_name == 'pull_request_review_comment' ||
       contains(github.event.comment.body, ' /oc') ||
       startsWith(github.event.comment.body, '/oc') ||
       contains(github.event.comment.body, ' /opencode') ||
@@ -35,6 +31,25 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
+      - name: Extrair prompt do comentário
+        id: extract
+        run: |
+          BODY="${{ github.event.comment.body }}"
+          PROMPT="${BODY#/oc }"
+          if [ "$PROMPT" = "$BODY" ]; then
+            PROMPT="${BODY#/opencode }"
+          fi
+          if [ "$PROMPT" = "$BODY" ]; then
+            PROMPT="${BODY#/oc}"
+          fi
+          if [ "$PROMPT" = "$BODY" ]; then
+            PROMPT="${BODY#/opencode}"
+          fi
+          if [ -z "$PROMPT" ]; then
+            PROMPT="Revise este Pull Request em portugues."
+          fi
+          echo "prompt=${PROMPT}" >> "$GITHUB_OUTPUT"
+
       - uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
@@ -42,7 +57,4 @@ jobs:
         with:
           model: opencode/big-pickle
           use_github_token: true
-          prompt: |
-            Revise este Pull Request em portugues.
-            Analise os arquivos alterados, qualidade do codigo, possiveis bugs e sugira melhorias.
-            Seja conciso e objetivo.
+          prompt: ${{ steps.extract.outputs.prompt }}
