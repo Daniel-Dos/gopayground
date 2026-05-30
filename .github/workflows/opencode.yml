@@ -32,48 +32,18 @@ jobs:
       issues: write
       checks: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
-          fetch-depth: 0
+          fetch-depth: 1
 
-      # Extrai arquivos alterados usando tj-actions e passa a lista no prompt
-      # para o OpenCode focar apenas nos arquivos relevantes do PR
-      - name: Get changed files
-        id: changed-files
-        if: |
-          github.event_name == 'pull_request' ||
-          (github.event_name == 'pull_request_review_comment' && github.event.pull_request)
-        uses: tj-actions/changed-files@v46
-        continue-on-error: true
-
-      - name: Prepare prompt
-        id: prompt
-        env:
-          COMMENT_BODY: ${{ github.event.comment.body }}
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.event_name }}" = "pull_request_review_comment" ]; then
-            FILES="${{ steps.changed-files.outputs.all_changed_files }}"
-            echo "prompt<<OPROMPT_END" >> $GITHUB_OUTPUT
-            echo "Revise este Pull Request. Os arquivos alterados sao:" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
-            for f in $FILES; do
-              echo "- $f" >> $GITHUB_OUTPUT
-            done
-            echo "" >> $GITHUB_OUTPUT
-            echo "Analise cada arquivo alterado listado acima e forneca sugestoes de melhoria." >> $GITHUB_OUTPUT
-            echo "OPROMPT_END" >> $GITHUB_OUTPUT
-          else
-            echo "prompt<<OPROMPT_END" >> $GITHUB_OUTPUT
-            echo "$COMMENT_BODY" >> $GITHUB_OUTPUT
-            echo "OPROMPT_END" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Run opencode
-        uses: anomalyco/opencode/github@latest
+      - uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         with:
           model: opencode/big-pickle
-          prompt: ${{ steps.prompt.outputs.prompt }}
+          use_github_token: true
+          prompt: |
+            Revise este Pull Request em portugues.
+            Analise os arquivos alterados, qualidade do codigo, possiveis bugs e sugira melhorias.
+            Seja conciso e objetivo.
