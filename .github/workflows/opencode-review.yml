@@ -16,16 +16,17 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-       - name: Run OpenCode
-       - uses: anomalyco/opencode/github@latest
-         env:
-           ANTHROPIC_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-         with:
-           model: opencode/big-pickle
-           use_github_token: true
-           prompt: |
-             Revise este pull request:
-             - Verifique problemas de qualidade de código
-             - Procure por potenciais bugs
-             - Sugira melhorias
+      - name: Run OpenCode
+        uses: anomalyco/opencode/github@latest
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          model: opencode/big-pickle
+          use_github_token: true
+          prompt: |
+            Revise este pull request:
+            - Verifique problemas de qualidade de código
+            - Procure por potenciais bugs
+            - Sugira melhorias
+
