@@ -50,7 +50,7 @@ jobs:
           fi
           echo "prompt=${PROMPT}" >> "$GITHUB_OUTPUT"
       - name: Run OpenCode
-      - uses: anomalyco/opencode/github@latest
+        uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -58,3 +58,4 @@ jobs:
           model: opencode/big-pickle
           use_github_token: true
           prompt: ${{ steps.extract.outputs.prompt }}
+
