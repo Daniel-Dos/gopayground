@@ -49,7 +49,7 @@ jobs:
             PROMPT="Revise este Pull Request em portugues."
           fi
           echo "prompt=${PROMPT}" >> "$GITHUB_OUTPUT"
-
+      - name: Run OpenCode
       - uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
