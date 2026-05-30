@@ -10,8 +10,8 @@ jobs:
     permissions:
       id-token: write
       contents: read
-      pull-requests: read
-      issues: read
+      pull-requests: write
+      issues: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -25,8 +25,7 @@ jobs:
           model: opencode/big-pickle
           use_github_token: true
           prompt: |
-            Revise este pull request:
+            Revisa este pull request:
             - Verifique problemas de qualidade de código
             - Procure por potenciais bugs
             - Sugira melhorias
-
