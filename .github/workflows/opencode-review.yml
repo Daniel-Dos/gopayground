@@ -26,6 +26,6 @@ jobs:
           use_github_token: true
           prompt: |
             Revisa este pull request:
-            - Verifique problemas de qualidade de código
-            - Procure por potenciais bugs
-            - Sugira melhorias
+             - nao faça nenhuma analise profunda 
+             - nem pegue o contexto do projeto.
+             - deve ser simples e rapido, porém relevante.
