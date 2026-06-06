@@ -93,13 +93,22 @@ O servidor tenta conectar ao Kafka com **backoff exponencial** antes de iniciar 
 
 Se o Kafka não estiver disponível após 30 segundos, o servidor falha na inicialização.
 
+#### OpenTelemetry
+
+O modo servidor HTTP inicializa **TracerProvider** e **MeterProvider** do OpenTelemetry durante a inicialização. Traces e métricas são exportados via protocolo OTLP gRPC para o endpoint configurado (`OTEL_ENDPOINT`, default `localhost:4317`).
+
+O coletor OTel (`otel-collector`) já está configurado no `docker-compose.yml` para receber e processar a telemetria. Consulte [`docs/observability.md`](observability.md) para detalhes sobre a hierarquia de spans, métricas e configuração do coletor.
+
 #### Graceful Shutdown
 
 O servidor HTTP responde a `SIGINT` e `SIGTERM`:
 1. Recebe o sinal → inicia shutdown
 2. HTTP server para de aceitar novas conexões
-3. Conexões existentes têm até **15 segundos** para finalizar
+3. Conexões existentes têm até o timeout configurado para finalizar (default: **30 segundos**)
 4. Kafka producer é fechado
+5. OpenTelemetry **TracerProvider** e **MeterProvider** são desligados (flush de traces e métricas pendentes)
+
+> O timeout de shutdown é configurável via `SERVER_GRACEFUL_SHUTDOWN_TIMEOUT` no `config.yaml` ou variável de ambiente.
 
 ## Endpoints HTTP
 
@@ -233,6 +242,8 @@ Health check simples para readiness/liveness.
 
 ### Modo CLI (`publish`)
 
+O modo CLI usa apenas **flags de linha de comando** para configuração. Não carrega `config.yaml` nem variáveis de ambiente.
+
 | Parâmetro | Default | Flag |
 |-----------|---------|------|
 | Brokers Kafka | `localhost:9092` | `--brokers` |
@@ -242,11 +253,25 @@ Health check simples para readiness/liveness.
 
 ### Modo Servidor HTTP (`serve`)
 
-| Parâmetro | Default | Flag / Env |
-|-----------|---------|------------|
-| Porta HTTP | `8082` | `--port` |
-| Brokers Kafka | `localhost:9092` | `--brokers` |
-| Tópico | `payment.events` | `--topic` |
+O modo servidor HTTP segue o **padrão 12-Factor**: carrega configuração de múltiplas fontes com a seguinte **ordem de precedência** (da maior para a menor):
+
+1. **Flag `--port` explícita** (ex: `--port 9090`) — default `""` (vazio)
+2. **Variável de ambiente `PRODUCER_PORT`** (mapeamento automático via Viper com `_`)
+3. **Arquivo `config.yaml`** → seção `producer.port: 8082`
+4. **Fallback hardcoded** `8082` (se todas as fontes acima resultarem em zero)
+
+> O producer tem sua própria seção no `config.yaml` (`producer.port`), separada do `server.port` usado pelo consumer. A flag `--port` tem default `""` (vazio) — se omitida, o valor vem do `config.yaml` ou da variável de ambiente `PRODUCER_PORT`.
+
+O arquivo `config.yaml` deve estar presente no diretório de trabalho (raiz do projeto). É copiado pelo `Dockerfile.producer` durante o build da imagem.
+
+| Variável de Ambiente | Campo `config.yaml` | Descrição | Default efetivo |
+|----------------------|---------------------|-----------|-----------------|
+| `PRODUCER_PORT` | `producer.port` | Porta do servidor HTTP do producer | `8082` |
+| `KAFKA_BROKERS` | `kafka.brokers` | Brokers Kafka separados por vírgula | `localhost:9092` |
+| `KAFKA_TOPIC` | `kafka.topic` | Tópico Kafka para publicação | `payment.events` |
+| `OTEL_ENDPOINT` | `otel.endpoint` | Endpoint OTLP gRPC para envio de traces e métricas | `localhost:4317` |
+| `OTEL_SERVICE_NAME` | `otel.service_name` | Nome do serviço registrado nos traces e métricas | `payment-consumer` |
+| `SERVER_GRACEFUL_SHUTDOWN_TIMEOUT` | `server.graceful_shutdown_timeout` | Timeout para desligamento gracioso do servidor | `30s` |
 
 ## Exemplos de Uso
 
@@ -268,8 +293,11 @@ Veja mais exemplos em [`docs/features/cli-producer.md`](features/cli-producer.md
 ### Modo Servidor HTTP
 
 ```bash
-# Iniciar servidor
-producer serve --port 8082 --brokers localhost:9092
+# Iniciar servidor (porta do config.yaml: 8082)
+producer serve
+
+# Iniciar servidor com porta explícita
+producer serve --port 9090 --brokers localhost:9092
 
 # Publicar evento
 curl -X POST http://localhost:8082/publish \
@@ -287,17 +315,24 @@ curl http://localhost:8082/healthz
 
 ### Docker Compose
 
-No `docker-compose.yml`, o serviço `producer` já está configurado para iniciar em modo `serve`:
+No `docker-compose.yml`, o serviço `producer` já está configurado para iniciar em modo `serve`. As flags de linha de comando podem ser omitidas — o producer agora lê `config.yaml` (copiado pelo `Dockerfile.producer`) combinado com variáveis de ambiente definidas no compose:
 
 ```yaml
 producer:
   build:
     context: .
     dockerfile: Dockerfile.producer
-  command: ["serve", "--port", "8082", "--brokers", "kafka:9092"]
+  command: ["serve"]
   ports:
     - "8082:8082"
+  environment:
+    KAFKA_BROKERS: kafka:9092
+    KAFKA_TOPIC: payment.events
+    OTEL_ENDPOINT: otel-collector:4317
+    OTEL_SERVICE_NAME: payment-producer
 ```
+
+As variáveis de ambiente definidas em `environment` são lidas automaticamente pelo sistema de configuração (Viper) e sobrescrevem os defaults do `config.yaml`. O comando `["serve"]` não passa flags de porta — o valor `8082` vem do `config.yaml` e pode ser sobrescrito via `PRODUCER_PORT` no `environment`.
 
 Acesse: `http://localhost:8082`
 
@@ -309,10 +344,12 @@ Acesse: `http://localhost:8082`
 |---------|---------------|--------------|
 | Ciclo de vida | One-shot (executa e sai) | Long-lived (até SIGTERM) |
 | Fonte de dados | Flags, stdin, arquivo, auto-geração | JSON body da requisição |
+| Fonte de configuração | Flags apenas | `config.yaml` + env vars + flags |
+| OpenTelemetry | Não | Sim (traces e métricas via OTLP) |
 | Saída | Texto ou JSON no stdout | JSON na resposta HTTP |
 | Rate limiting | Sim (`--rate`) | Não (publica tudo de uma vez) |
 | Logging | Mensagens em stderr | JSON estruturado (slog) |
-| Graceful shutdown | Sim (Ctrl+C interrompe bulk) | Sim (SIGINT/SIGTERM) |
+| Graceful shutdown | Sim (Ctrl+C interrompe bulk) | Sim (SIGINT/SIGTERM, timeout configurável) |
 | Retry na conexão Kafka | Sim (backoff exponencial) | Sim (backoff exponencial) |
 
 ### Portas
@@ -333,4 +370,4 @@ Acesse: `http://localhost:8082`
 | Content-Type ausente ou inválido | Rejeitado com 415 |
 | `count` fora do range 1-100 | Rejeitado com 400 |
 | Bulk com falha parcial | Response inclui campo `error` nos itens falhos |
-| Sinal SIGTERM durante requisição | Graceful shutdown: requisições ativas têm 15s para completar |
+| Sinal SIGTERM durante requisição | Graceful shutdown: requisições ativas têm o timeout configurado para completar |

@@ -68,6 +68,11 @@ type RetryConfig struct {
 	BaseDelayMs int `mapstructure:"base_delay_ms"`
 }
 
+// ProducerConfig contém configurações específicas do servidor HTTP do producer.
+type ProducerConfig struct {
+	Port int `mapstructure:"port"`
+}
+
 // OTelConfig contém configurações do OpenTelemetry (tracing e métricas).
 type OTelConfig struct {
 	Endpoint    string `mapstructure:"endpoint"`
@@ -77,6 +82,7 @@ type OTelConfig struct {
 // Config agrupa toda a configuração da aplicação por domínio.
 type Config struct {
 	Server   ServerConfig   `mapstructure:"server"`
+	Producer ProducerConfig `mapstructure:"producer"`
 	Kafka    KafkaConfig    `mapstructure:"kafka"`
 	Redis    RedisConfig    `mapstructure:"redis"`
 	DynamoDB DynamoDBConfig `mapstructure:"dynamodb"`
