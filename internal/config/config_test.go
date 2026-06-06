@@ -21,6 +21,7 @@ func TestConfigDefaults(t *testing.T) {
 		"OTEL_ENDPOINT", "OTEL_SERVICE_NAME",
 		"SERVER_GRACEFUL_SHUTDOWN_TIMEOUT",
 		"UI_PORT", "UI_EVENT_BUS_BUFFER", "UI_READ_TIMEOUT", "UI_WRITE_TIMEOUT",
+		"PRODUCER_PORT",
 	} {
 		os.Unsetenv(key)
 	}
@@ -62,6 +63,9 @@ func TestConfigDefaults(t *testing.T) {
 	assert.Equal(t, 256, cfg.UI.EventBusBuffer)
 	assert.Equal(t, 10*time.Second, cfg.UI.ReadTimeout)
 	assert.Equal(t, 30*time.Second, cfg.UI.WriteTimeout)
+
+	// Producer
+	assert.Equal(t, 8082, cfg.Producer.Port)
 }
 
 func TestConfigEnvOverrides(t *testing.T) {
@@ -86,6 +90,7 @@ func TestConfigEnvOverrides(t *testing.T) {
 	os.Setenv("UI_EVENT_BUS_BUFFER", "512")
 	os.Setenv("UI_READ_TIMEOUT", "5s")
 	os.Setenv("UI_WRITE_TIMEOUT", "60s")
+	os.Setenv("PRODUCER_PORT", "9090")
 
 	defer func() {
 		os.Unsetenv("KAFKA_BROKERS")
@@ -108,6 +113,7 @@ func TestConfigEnvOverrides(t *testing.T) {
 		os.Unsetenv("UI_EVENT_BUS_BUFFER")
 		os.Unsetenv("UI_READ_TIMEOUT")
 		os.Unsetenv("UI_WRITE_TIMEOUT")
+		os.Unsetenv("PRODUCER_PORT")
 	}()
 
 	cfg := config.NewConfig()
@@ -134,6 +140,9 @@ func TestConfigEnvOverrides(t *testing.T) {
 	assert.Equal(t, 512, cfg.UI.EventBusBuffer)
 	assert.Equal(t, 5*time.Second, cfg.UI.ReadTimeout)
 	assert.Equal(t, 60*time.Second, cfg.UI.WriteTimeout)
+
+	// Producer overrides
+	assert.Equal(t, 9090, cfg.Producer.Port)
 }
 
 func TestConfigServerPortDefault(t *testing.T) {
