@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/Daniel-Dos/gopayground/internal/config"
 	"github.com/Daniel-Dos/gopayground/internal/models"
 	"github.com/Daniel-Dos/gopayground/internal/producer"
 
@@ -192,6 +193,59 @@ func TestPrintResults_NoError(t *testing.T) {
 	printResults(results, false)
 	printResults(results, true)
 }
+
+// --- Testes para serveFlags.apply ---
+
+func TestServeFlagsApply_PortFlag(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected int
+	}{
+		{"flag explicit 9090", []string{"--port", "9090"}, 9090},
+		{"flag default empty stays 0 (fallback)", nil, 0},
+		{"invalid flag ignored", []string{"--port", "abc"}, 0},
+		{"negative flag ignored", []string{"--port", "-1"}, 0},
+		{"out of range ignored", []string{"--port", "99999"}, 0},
+		{"port 1 valid", []string{"--port", "1"}, 1},
+		{"port 65535 valid", []string{"--port", "65535"}, 65535},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f, err := parseServeFlagsArgs(tt.args)
+			require.NoError(t, err)
+
+			cfg := config.Config{}
+			f.apply(&cfg)
+			assert.Equal(t, tt.expected, cfg.Producer.Port)
+		})
+	}
+}
+
+func TestServeFlagsApply_BrokersAndTopic(t *testing.T) {
+	f, err := parseServeFlagsArgs([]string{"--brokers", "kafka:9092", "--topic", "custom.topic"})
+	require.NoError(t, err)
+
+	cfg := config.Config{}
+	f.apply(&cfg)
+
+	assert.Equal(t, "kafka:9092", cfg.Kafka.Brokers)
+	assert.Equal(t, "custom.topic", cfg.Kafka.Topic)
+}
+
+func TestServeFlagsApply_OnlyBrokers(t *testing.T) {
+	f, err := parseServeFlagsArgs([]string{"--brokers", "broker1:9092,broker2:9092"})
+	require.NoError(t, err)
+
+	cfg := config.Config{}
+	f.apply(&cfg)
+
+	assert.Equal(t, "broker1:9092,broker2:9092", cfg.Kafka.Brokers)
+	assert.Equal(t, "", cfg.Kafka.Topic)  // não deve ser alterado
+	assert.Equal(t, 0, cfg.Producer.Port) // não deve ser alterado
+}
+
+// --- Fim dos testes serveFlags ---
 
 func TestPrintEvents(t *testing.T) {
 	events := []*models.PaymentEvent{

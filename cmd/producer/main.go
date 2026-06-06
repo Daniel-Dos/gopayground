@@ -10,16 +10,20 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/Daniel-Dos/gopayground/internal/config"
 	"github.com/Daniel-Dos/gopayground/internal/kafka"
 	"github.com/Daniel-Dos/gopayground/internal/models"
 	"github.com/Daniel-Dos/gopayground/internal/producer"
 	"github.com/Daniel-Dos/gopayground/internal/validator"
+	"github.com/Daniel-Dos/gopayground/pkg/telemetry"
 
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
 )
 
 const maxFileSize = 10 * 1024 * 1024
@@ -266,9 +270,9 @@ type serveFlags struct {
 func newServeFlagSet(f *serveFlags) *flag.FlagSet {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 
-	fs.StringVar(&f.port, "port", "8082", "HTTP server port")
-	fs.StringVar(&f.brokers, "brokers", "localhost:9092", "Brokers Kafka separados por virgula")
-	fs.StringVar(&f.topic, "topic", "payment.events", "Topico Kafka")
+	fs.StringVar(&f.port, "port", "", "HTTP server port (default: config.yaml producer.port, ou 8082)")
+	fs.StringVar(&f.brokers, "brokers", "", "Brokers Kafka separados por virgula (default: config/env)")
+	fs.StringVar(&f.topic, "topic", "", "Topico Kafka (default: config/env)")
 
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Uso: producer serve [flags]\n\nFlags:\n")
@@ -286,6 +290,28 @@ func parseServeFlagsArgs(args []string) (serveFlags, error) {
 		return f, err
 	}
 	return f, nil
+}
+
+// apply aplica as flags sobre a configuração carregada.
+// Flags com valor vazio são ignoradas (não fornecidas).
+func (f *serveFlags) apply(cfg *config.Config) {
+	if f.port != "" {
+		port, err := strconv.Atoi(f.port)
+		switch {
+		case err != nil:
+			slog.Warn("ignoring invalid --port value (not a number)", "value", f.port)
+		case port < 1 || port > 65535:
+			slog.Warn("ignoring --port value out of valid range (1-65535)", "value", port)
+		default:
+			cfg.Producer.Port = port
+		}
+	}
+	if f.brokers != "" {
+		cfg.Kafka.Brokers = f.brokers
+	}
+	if f.topic != "" {
+		cfg.Kafka.Topic = f.topic
+	}
 }
 
 func run() int {
@@ -375,26 +401,44 @@ func runPublish(args []string) int {
 // runServe inicia um servidor HTTP de longa duração que expõe endpoints de publicação Kafka.
 // Este é o modo usado no docker-compose para o serviço "producer".
 func runServe(args []string) int {
+	// 1. Carregar configuração (config.yaml + env vars)
+	cfg := config.NewConfig()
+
+	// 2. Parsear flags e aplicar sobre a config
 	f, err := parseServeFlagsArgs(args)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
+	f.apply(&cfg)
 
-	// Logger estruturado (mesmo padrão do consumidor e UI)
+	// 3. Logger estruturado (precisa vir antes de warnings)
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
 
+	// 4. Fallback para porta default se config não foi carregada
+	if cfg.Producer.Port == 0 {
+		cfg.Producer.Port = 8082
+		logger.Warn("producer.port não configurado (config.yaml, env ou --port), usando fallback", "port", 8082)
+	}
+
+	// 5. Extrair valores da config
+	brokers := strings.Split(cfg.Kafka.Brokers, ",")
+	topic := cfg.Kafka.Topic
+	port := fmt.Sprintf("%d", cfg.Producer.Port)
+
 	logger.Info("iniciando servidor HTTP do produtor",
-		"port", f.port,
-		"brokers", f.brokers,
-		"topic", f.topic,
+		"service", cfg.OTel.ServiceName,
+		"port", port,
+		"brokers", cfg.Kafka.Brokers,
+		"topic", topic,
 	)
 
+	// 5. Contexto raiz para shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Captura SIGINT/SIGTERM para desligamento gracioso
+	// 6. Capturar sinais (SIGINT/SIGTERM) para desligamento gracioso
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -403,9 +447,44 @@ func runServe(args []string) int {
 		cancel()
 	}()
 
-	// Conectar ao Kafka com retry
+	// 7. Inicializar OpenTelemetry (syncProducer será criado depois,
+	// então seus defers executarão primeiro — LIFO — fechando Kafka
+	// antes de desligar OTel, garantindo que traces da desconexão
+	// sejam capturados)
+	mp, err := telemetry.InitMeterProvider(ctx, cfg)
+	if err != nil {
+		logger.Error("falha ao inicializar meter provider", "error", err)
+		return 1
+	}
+	defer func() {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.Server.GracefulShutdownTimeout)
+		defer shutdownCancel()
+		if err := mp.Shutdown(shutdownCtx); err != nil {
+			logger.Error("erro ao desligar meter provider", "error", err)
+		}
+	}()
+
+	tp, err := telemetry.InitTracerProvider(ctx, cfg)
+	if err != nil {
+		logger.Error("falha ao inicializar tracer provider", "error", err)
+		return 1
+	}
+	defer func() {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.Server.GracefulShutdownTimeout)
+		defer shutdownCancel()
+		if err := tp.Shutdown(shutdownCtx); err != nil {
+			logger.Error("erro ao desligar tracer provider", "error", err)
+		}
+	}()
+
+	tracer := otel.Tracer(cfg.OTel.ServiceName)
+	meter := otel.Meter(cfg.OTel.ServiceName)
+	_ = tracer // reservado para uso futuro em handlers
+	_ = meter  // reservado para uso futuro em métricas
+
+	// 8. Conectar ao Kafka com retry
 	saramaCfg := kafka.NewProducerSaramaConfig(kafka.DefaultProducerConfig())
-	syncProducer, err := kafka.NewSyncProducerWithRetry(ctx, strings.Split(f.brokers, ","), saramaCfg)
+	syncProducer, err := kafka.NewSyncProducerWithRetry(ctx, brokers, saramaCfg)
 	if err != nil {
 		logger.Error("cannot connect to Kafka", "error", err)
 		return 1
@@ -417,11 +496,13 @@ func runServe(args []string) int {
 	}()
 
 	v := validator.New()
-	svc := producer.New(syncProducer, f.topic, v)
+	svc := producer.New(syncProducer, topic, v)
 
-	// Publica 10 eventos aleatórios na inicialização (melhor esforço)
+	// 9. Publica 10 eventos aleatórios na inicialização (melhor esforço)
+	// Usa o ctx principal para ser cancelado no shutdown, evitando data race
+	// com syncProducer.Close() no defer.
 	go func() {
-		startupCtx, startupCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		startupCtx, startupCancel := context.WithTimeout(ctx, 30*time.Second)
 		defer startupCancel()
 
 		events := producer.GenerateBulkEvents(10)
@@ -435,13 +516,13 @@ func runServe(args []string) int {
 		logger.Info("publicação inicial concluída", "total", len(events), "published", published)
 	}()
 
-	// Configuração do servidor HTTP
+	// 10. Configuração do servidor HTTP
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /publish", handlePublish(svc, logger))
 	mux.HandleFunc("POST /publish/bulk", handlePublishBulk(svc, logger))
 	mux.HandleFunc("GET /healthz", handleHealthz(logger))
 
-	addr := ":" + f.port
+	addr := ":" + port
 	httpServer := &http.Server{
 		Addr:         addr,
 		Handler:      mux,
@@ -449,11 +530,11 @@ func runServe(args []string) int {
 		WriteTimeout: 10 * time.Second,
 	}
 
-	// Goroutine de desligamento gracioso
+	// 11. Goroutine de desligamento gracioso
 	go func() {
 		<-ctx.Done()
 		logger.Info("shutting down HTTP server")
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.Server.GracefulShutdownTimeout)
 		defer shutdownCancel()
 		if err := httpServer.Shutdown(shutdownCtx); err != nil {
 			logger.Error("HTTP server shutdown error", "error", err)
